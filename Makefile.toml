@@ -1,0 +1,10 @@
+[tasks.image]
+script = ["docker build --platform linux/amd64 -t compilerbook -f Dockerfile ."]
+
+[tasks.login]
+script = ["docker run --rm -it -v $(pwd):/ws --platform linux/amd64 compilerbook"]
+
+[tasks.cb_test]
+script = [
+    "docker run -it -v $(pwd):/ws -w /ws --platform linux/amd64 compilerbook ./test.sh"
+]
