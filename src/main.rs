@@ -1,5 +1,6 @@
-mod tokenizer;
 mod error;
+mod tokenizer;
+mod parser;
 mod compiler;
 
 use std::env;
@@ -12,5 +13,10 @@ fn main() {
 
 	let input = &args[1];
 	let tokens = tokenizer::tokenize(input);
+	// let mut parser = parser::Parser::new(tokens.clone());
+	// let node = parser.expr().expect("パースに失敗しました");
+
+	// node.print();
+
 	compiler::compile(&tokens);
 }

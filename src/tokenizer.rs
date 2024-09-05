@@ -1,13 +1,13 @@
 use crate::error;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum TokenKind {
 	Reserved,
 	Num,
 	Eof,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Token {
 	pub kind: TokenKind,
 	pub val: Option<i32>,
@@ -24,7 +24,7 @@ pub fn tokenize(input: &str) -> Vec<Token> {
 			continue;
 		}
 
-		if c == '+' || c == '-' {
+		if "+-*/()".contains(c) {
 			tokens.push(Token {
 				kind: TokenKind::Reserved,
 				val: None,
