@@ -111,27 +111,48 @@ impl Parser {
 	}
 
 	fn mul(&mut self) -> Result<Node, String> {
-		let mut node = self.primary()?;
+		let mut node = self.unary()?;
 
 		loop {
 			if self.consume('*') {
 				node = Node {
 					kind: NodeKind::Mul,
 					lhs: Some(Box::new(node)),
-					rhs: Some(Box::new(self.primary()?)),
+					rhs: Some(Box::new(self.unary()?)),
 					val: None,
 				};
 			} else if self.consume('/') {
 				node = Node {
 					kind: NodeKind::Div,
 					lhs: Some(Box::new(node)),
-					rhs: Some(Box::new(self.primary()?)),
+					rhs: Some(Box::new(self.unary()?)),
 					val: None,
 				};
 			} else {
 				return Ok(node);
 			}
 		}	
+	}
+
+	fn unary(&mut self) -> Result<Node, String> {
+		if self.consume('+') {
+			return self.primary();
+		} else if self.consume('-') {
+			// 0 - x として扱う
+			return Ok(Node {
+				kind: NodeKind::Sub,
+				lhs: Some(Box::new(Node {
+					kind: NodeKind::Num,
+					lhs: None,
+					rhs: None,
+					val: Some(0),
+				})),
+				rhs: Some(Box::new(self.primary()?)),
+				val: None,
+			});
+		} else {
+			return self.primary();
+		}
 	}
 
 	fn primary(&mut self) -> Result<Node, String> {
