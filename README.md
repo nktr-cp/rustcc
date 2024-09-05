@@ -4,7 +4,8 @@
 四則演算の文法
 ```
 expr    ::= mul ("+" mul | "-" mul)*
-mul     ::= primary ("*" primary | "/" primary)*
+mul     ::= unary ("*" unrary | "/" unary)*
+unary   ::= ("+" | "-")? primary
 primary ::= num | "(" expr ")"
 ```
 
