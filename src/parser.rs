@@ -1,7 +1,7 @@
 use crate::tokenizer::{Token, TokenKind};
 
 #[derive(Debug, Clone)]
-enum NodeKind {
+pub enum NodeKind {
 	Add,
 	Sub,
 	Mul,
@@ -11,42 +11,42 @@ enum NodeKind {
 
 #[derive(Debug, Clone)]
 pub struct Node {
-	kind: NodeKind,
-	lhs: Option<Box<Node>>,
-	rhs: Option<Box<Node>>,
-	val: Option<i32>,
+	pub kind: NodeKind,
+	pub lhs: Option<Box<Node>>,
+	pub rhs: Option<Box<Node>>,
+	pub val: Option<i32>,
 }
 
 // debug
-impl Node {
-	pub fn print(&self) {
-		match self.kind {
-			NodeKind::Add => {
-				println!("Add");
-				self.lhs.as_ref().unwrap().print();
-				self.rhs.as_ref().unwrap().print();
-			}
-			NodeKind::Sub => {
-				println!("Sub");
-				self.lhs.as_ref().unwrap().print();
-				self.rhs.as_ref().unwrap().print();
-			}
-			NodeKind::Mul => {
-				println!("Mul");
-				self.lhs.as_ref().unwrap().print();
-				self.rhs.as_ref().unwrap().print();
-			}
-			NodeKind::Div => {
-				println!("Div");
-				self.lhs.as_ref().unwrap().print();
-				self.rhs.as_ref().unwrap().print();
-			}
-			NodeKind::Num => {
-				println!("Num: {}", self.val.unwrap());
-			}
-		}
-	}
-}
+// impl Node {
+// 	pub fn print(&self) {
+// 		match self.kind {
+// 			NodeKind::Add => {
+// 				println!("Add");
+// 				self.lhs.as_ref().unwrap().print();
+// 				self.rhs.as_ref().unwrap().print();
+// 			}
+// 			NodeKind::Sub => {
+// 				println!("Sub");
+// 				self.lhs.as_ref().unwrap().print();
+// 				self.rhs.as_ref().unwrap().print();
+// 			}
+// 			NodeKind::Mul => {
+// 				println!("Mul");
+// 				self.lhs.as_ref().unwrap().print();
+// 				self.rhs.as_ref().unwrap().print();
+// 			}
+// 			NodeKind::Div => {
+// 				println!("Div");
+// 				self.lhs.as_ref().unwrap().print();
+// 				self.rhs.as_ref().unwrap().print();
+// 			}
+// 			NodeKind::Num => {
+// 				println!("Num: {}", self.val.unwrap());
+// 			}
+// 		}
+// 	}
+// }
 
 pub struct Parser {
 	tokens: Vec<Token>,

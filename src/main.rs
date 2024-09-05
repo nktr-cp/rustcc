@@ -1,7 +1,7 @@
 mod error;
 mod tokenizer;
 mod parser;
-mod compiler;
+mod gen;
 
 use std::env;
 
@@ -13,10 +13,15 @@ fn main() {
 
 	let input = &args[1];
 	let tokens = tokenizer::tokenize(input);
-	// let mut parser = parser::Parser::new(tokens.clone());
-	// let node = parser.expr().expect("パースに失敗しました");
+	let mut parser = parser::Parser::new(tokens.clone());
+	let node = parser.expr().expect("パースに失敗しました");
 
-	// node.print();
+	println!(".intel_syntax noprefix");
+	println!(".global main");
+	println!("main:");
 
-	compiler::compile(&tokens);
+	gen::gen(&node);
+	
+	println!("  pop rax");
+	println!("  ret");
 }
