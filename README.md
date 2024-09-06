@@ -1,12 +1,15 @@
 # simple C compiler written in Rust
 
 ## Production rule
-四則演算の文法
+比較演算子をサポートした文法
 ```
-expr    ::= mul ("+" mul | "-" mul)*
-mul     ::= unary ("*" unrary | "/" unary)*
-unary   ::= ("+" | "-")? primary
-primary ::= num | "(" expr ")"
+expr       ::= equality
+equality   ::= relational ("==" relational | "!=" relational)*
+relational ::= add ("<" add | "<=" add | ">" add | ">=" add)*
+add        ::= mul ("+" mul | "-" mul)*
+mul        ::= unary ("*" unary | "/" unary)*
+unary      ::= ("+" | "-")? primary
+primary    ::= num | "(" expr ")"
 ```
 
 ## Acknowledgments
