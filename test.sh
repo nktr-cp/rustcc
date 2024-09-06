@@ -31,4 +31,19 @@ assert 4 '(3+5)/2'
 assert 10 "-10+20"
 assert 42 "(-5+11)*(-7/-1)"
 
+assert 1 "1==1"
+assert 0 "1==2"
+assert 1 "1!=2"
+assert 0 "1!=1"
+assert 1 "1<2"
+assert 0 "1<1"
+assert 1 "1<=1"
+assert 1 "1<=2"
+assert 0 "1>2"
+assert 0 "1>1"
+assert 1 "2>1"
+assert 1 "2>=1"
+assert 1 "2>=2"
+assert 0 "1>=2"
+
 echo OK

@@ -21,6 +21,36 @@ pub fn gen(node: &Node) {
 					println!("  cqo");
 					println!("  idiv rdi");
 				}
+				NodeKind::Eq => {
+					println!("  cmp rax, rdi");
+					println!("  sete al");
+					println!("  movzb rax, al");
+				}
+				NodeKind::Nq => {
+					println!("  cmp rax, rdi");
+					println!("  setne al");
+					println!("  movzb rax, al");
+				}
+				NodeKind::Lt => {
+					println!("  cmp rax, rdi");
+					println!("  setl al");
+					println!("  movzb rax, al");
+				}
+				NodeKind::Le => {
+					println!("  cmp rax, rdi");
+					println!("  setle al");
+					println!("  movzb rax, al");
+				}
+				NodeKind::Gt => {
+					println!("  cmp rax, rdi");
+					println!("  setg al");
+					println!("  movzb rax, al");
+				}
+				NodeKind::Ge => {
+					println!("  cmp rax, rdi");
+					println!("  setge al");
+					println!("  movzb rax, al");
+				}
 				_ => unreachable!(),
 			}
 

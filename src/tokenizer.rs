@@ -7,7 +7,7 @@ pub enum TokenKind {
 	Eof,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Token {
 	pub kind: TokenKind,
 	pub val: Option<i32>,
@@ -31,6 +31,26 @@ pub fn tokenize(input: &str) -> Vec<Token> {
 				str: c.to_string(),
 			});
 			chars.next();
+			continue;
+		}
+
+		if c == '=' || c == '!' || c == '<' || c == '>' {
+			let mut op = String::new();
+			op.push(c);
+			chars.next();
+
+			if let Some(&next_c) = chars.peek() {
+				if next_c == '=' {
+					op.push(next_c);
+					chars.next();
+				}
+			}
+
+			tokens.push(Token {
+				kind: TokenKind::Reserved,
+				val: None,
+				str: op,
+			});
 			continue;
 		}
 

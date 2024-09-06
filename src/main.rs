@@ -13,7 +13,7 @@ fn main() {
 
 	let input = &args[1];
 	let tokens = tokenizer::tokenize(input);
-	let mut parser = parser::Parser::new(tokens.clone());
+	let mut parser = parser::Parser::new(tokens);
 	let node = parser.expr().expect("パースに失敗しました");
 
 	println!(".intel_syntax noprefix");
