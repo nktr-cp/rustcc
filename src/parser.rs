@@ -68,7 +68,7 @@ pub struct Node {
 pub struct Parser {
 	tokens: Vec<Token>,
 	pos: usize,
-	locals: HashMap<String, LVar>,
+	pub locals: HashMap<String, LVar>,
 }
 
 impl Parser {

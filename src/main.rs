@@ -21,10 +21,9 @@ fn main() {
 	println!("main:");
 
 	// prologue
-	// 26文字の変数分の領域を確保
 	println!("  push rbp");
 	println!("  mov rbp, rsp");
-	println!("  sub rsp, 208");
+	println!("  sub rsp, {}", parser.locals.len() * 8 + 8);
 
 	for node in code.iter() {
 		gen::gen(node);
