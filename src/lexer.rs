@@ -15,6 +15,10 @@ pub struct Token {
 	pub str: String,
 }
 
+fn is_alnum(c: char) -> bool {
+	c.is_ascii_alphabetic() || c.is_ascii_digit() || c == '_'
+}
+
 pub fn tokenize(input: &str) -> Vec<Token> {
 	let mut tokens = Vec::new();
 	let mut chars = input.chars().peekable();
@@ -72,11 +76,15 @@ pub fn tokenize(input: &str) -> Vec<Token> {
 			continue;
 		}
 
-		if c >= 'a' && c <= 'z'{
+		if is_alnum(c) {
 			let mut ident = String::new();
-			ident.push(c);
-			chars.next();
-
+			while let Some(&c) = chars.peek() {
+				if !is_alnum(c) {
+					break;
+				}
+				ident.push(c);
+				chars.next();
+			}
 			tokens.push(Token {
 				kind: TokenKind::Ident,
 				val: None,

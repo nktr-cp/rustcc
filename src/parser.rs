@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use crate::lexer::{Token, TokenKind};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -17,13 +18,20 @@ pub enum NodeKind {
 	Num,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct LVar {
+	pub name: String,
+	pub offset: usize,
+}
+
 #[derive(Debug, Clone)]
 pub struct Node {
 	pub kind: NodeKind,
 	pub lhs: Option<Box<Node>>,
 	pub rhs: Option<Box<Node>>,
 	pub val: Option<i32>,
-	pub offset: Option<i32>,
+	// pub lvar: Option<i32>,
+	pub lvar: Option<LVar>,
 }
 
 // debug
@@ -60,11 +68,24 @@ pub struct Node {
 pub struct Parser {
 	tokens: Vec<Token>,
 	pos: usize,
+	locals: HashMap<String, LVar>,
 }
 
 impl Parser {
 	pub fn new(tokens: Vec<Token>) -> Self {
-		Parser { tokens, pos: 0 }
+		Parser { tokens, pos: 0, locals: HashMap::new() }
+	}
+
+	fn find_or_create_lvar(&mut self, name: &str) -> LVar {
+		if let Some(lvar) = self.locals.get(name) {
+			return lvar.clone();
+		}
+		let lvar = LVar {
+			name: name.to_string(),
+			offset: (self.locals.len() + 1) * 8,
+		};
+		self.locals.insert(name.to_string(), lvar.clone());
+		lvar
 	}
 
 	fn consume(&mut self, op: &str) -> bool {
@@ -122,7 +143,7 @@ impl Parser {
 				lhs: Some(Box::new(node)),
 				rhs: Some(Box::new(self.assign()?)),
 				val: None,
-				offset: None,
+				lvar: None,
 			};
 		}
 
@@ -139,7 +160,7 @@ impl Parser {
 					lhs: Some(Box::new(node)),
 					rhs: Some(Box::new(self.relational()?)),
 					val: None,
-					offset: None,
+					lvar: None,
 				};
 			} else if self.consume("!=") {
 				node = Node {
@@ -147,7 +168,7 @@ impl Parser {
 					lhs: Some(Box::new(node)),
 					rhs: Some(Box::new(self.relational()?)),
 					val: None,
-					offset: None,
+					lvar: None,
 				};
 			} else {
 				return Ok(node);
@@ -165,7 +186,7 @@ impl Parser {
 					lhs: Some(Box::new(node)),
 					rhs: Some(Box::new(self.add()?)),
 					val: None,
-					offset: None,
+					lvar: None,
 				};
 			} else if self.consume("<=") {
 				node = Node {
@@ -173,7 +194,7 @@ impl Parser {
 					lhs: Some(Box::new(node)),
 					rhs: Some(Box::new(self.add()?)),
 					val: None,
-					offset: None,
+					lvar: None,
 				};
 			} else if self.consume(">") {
 				node = Node {
@@ -181,7 +202,7 @@ impl Parser {
 					lhs: Some(Box::new(node)),
 					rhs: Some(Box::new(self.add()?)),
 					val: None,
-					offset: None,
+					lvar: None,
 				};
 			} else if self.consume(">=") {
 				node = Node {
@@ -189,7 +210,7 @@ impl Parser {
 					lhs: Some(Box::new(node)),
 					rhs: Some(Box::new(self.add()?)),
 					val: None,
-					offset: None,
+					lvar: None,
 				};
 			} else {
 				return Ok(node);
@@ -207,7 +228,7 @@ impl Parser {
 					lhs: Some(Box::new(node)),
 					rhs: Some(Box::new(self.mul()?)),
 					val: None,
-					offset: None,
+					lvar: None,
 				};
 				} else if self.consume("-") {
 				node = Node {
@@ -215,7 +236,7 @@ impl Parser {
 					lhs: Some(Box::new(node)),
 					rhs: Some(Box::new(self.mul()?)),
 					val: None,
-					offset: None,
+					lvar: None,
 				};
 			} else {
 				return Ok(node);
@@ -233,7 +254,7 @@ impl Parser {
 					lhs: Some(Box::new(node)),
 					rhs: Some(Box::new(self.unary()?)),
 					val: None,
-					offset: None,
+					lvar: None,
 				};
 			} else if self.consume("/") {
 				node = Node {
@@ -241,7 +262,7 @@ impl Parser {
 					lhs: Some(Box::new(node)),
 					rhs: Some(Box::new(self.unary()?)),
 					val: None,
-					offset: None,
+					lvar: None,
 				};
 			} else {
 				return Ok(node);
@@ -261,11 +282,11 @@ impl Parser {
 					lhs: None,
 					rhs: None,
 					val: Some(0),
-					offset: None,
+					lvar: None,
 				})),
 				rhs: Some(Box::new(self.primary()?)),
 				val: None,
-				offset: None,
+				lvar: None,
 			});
 		} else {
 			return self.primary();
@@ -278,22 +299,22 @@ impl Parser {
 			self.expect(")")?;
 			Ok(node)
 		} else if self.tokens[self.pos].kind == TokenKind::Ident {
-			let node = Node {
+			let lvar = self.find_or_create_lvar(&self.tokens[self.pos].str.clone());
+			self.pos += 1;
+			Ok(Node {
 				kind: NodeKind::Lvar,
 				lhs: None,
 				rhs: None,
 				val: None,
-				offset: Some(8 * (self.tokens[self.pos].str.chars().next().unwrap() as i32 - 'a' as i32 + 1)),
-			};
-			self.pos += 1;
-			Ok(node)
+				lvar: Some(lvar),
+			})
 		} else {
 			Ok(Node {
 				kind: NodeKind::Num,
 				lhs: None,
 				rhs: None,
 				val: Some(self.expect_number()?),
-				offset: None,
+				lvar: None,
 			})
 		}
 	}

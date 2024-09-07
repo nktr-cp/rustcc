@@ -51,4 +51,8 @@ assert 14 "a=3; b=5*6-8; a+b/2;"
 assert 1 "a=1; a==1;"
 assert 42 "z=42; z;"
 
+assert 42 "variable=42; variable;"
+assert 42 "variable=42; another_variable=variable; another_variable;"
+assert 42 "a=13; hoge=21; fuga=8; a=42; a;"
+
 echo OK

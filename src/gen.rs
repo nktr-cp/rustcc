@@ -7,7 +7,7 @@ fn gen_lval(node: &Node) {
 	}
 
 	println!("  mov rax, rbp");
-	println!("  sub rax, {}", node.offset.unwrap());
+	println!("  sub rax, {}", node.lvar.clone().unwrap().offset);
 	println!("  push rax");
 }
 
