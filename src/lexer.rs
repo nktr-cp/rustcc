@@ -3,6 +3,7 @@ use crate::error;
 #[derive(Debug, PartialEq, Clone)]
 pub enum TokenKind {
 	Reserved,
+	Ident,
 	Num,
 	Eof,
 }
@@ -24,7 +25,7 @@ pub fn tokenize(input: &str) -> Vec<Token> {
 			continue;
 		}
 
-		if "+-*/()".contains(c) {
+		if "+-*/();".contains(c) {
 			tokens.push(Token {
 				kind: TokenKind::Reserved,
 				val: None,
@@ -67,6 +68,19 @@ pub fn tokenize(input: &str) -> Vec<Token> {
 				kind: TokenKind::Num,
 				val: Some(num_str.parse().unwrap()),
 				str: num_str,
+			});
+			continue;
+		}
+
+		if c >= 'a' && c <= 'z'{
+			let mut ident = String::new();
+			ident.push(c);
+			chars.next();
+
+			tokens.push(Token {
+				kind: TokenKind::Ident,
+				val: None,
+				str: ident,
 			});
 			continue;
 		}

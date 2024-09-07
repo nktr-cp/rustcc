@@ -1,5 +1,5 @@
 mod error;
-mod tokenizer;
+mod lexer;
 mod parser;
 mod gen;
 
@@ -12,16 +12,27 @@ fn main() {
 	}
 
 	let input = &args[1];
-	let tokens = tokenizer::tokenize(input);
+	let tokens = lexer::tokenize(input);
 	let mut parser = parser::Parser::new(tokens);
-	let node = parser.expr().expect("パースに失敗しました");
+	let code = parser.program().expect("構文解析に失敗しました");
 
 	println!(".intel_syntax noprefix");
 	println!(".global main");
 	println!("main:");
 
-	gen::gen(&node);
+	// prologue
+	// 26文字の変数分の領域を確保
+	println!("  push rbp");
+	println!("  mov rbp, rsp");
+	println!("  sub rsp, 208");
+
+	for node in code.iter() {
+		gen::gen(node);
+		println!("  pop rax");
+	}
 	
-	println!("  pop rax");
+	// epilogue
+	println!("  mov rsp, rbp");
+	println!("  pop rbp");
 	println!("  ret");
 }

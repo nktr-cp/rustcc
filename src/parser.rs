@@ -1,11 +1,13 @@
-use crate::tokenizer::{Token, TokenKind};
+use crate::lexer::{Token, TokenKind};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum NodeKind {
 	Add,
 	Sub,
 	Mul,
 	Div,
+	Assign,
+	Lvar,
 	Eq,
 	Nq,
 	Lt,
@@ -21,6 +23,7 @@ pub struct Node {
 	pub lhs: Option<Box<Node>>,
 	pub rhs: Option<Box<Node>>,
 	pub val: Option<i32>,
+	pub offset: Option<i32>,
 }
 
 // debug
@@ -92,8 +95,38 @@ impl Parser {
 		self.tokens[self.pos].kind == TokenKind::Eof
 	}
 
-	pub fn expr(&mut self) -> Result<Node, String> {
-		return self.equality();
+	pub fn program(&mut self) -> Result<Vec<Node>, String> {
+		let mut nodes = Vec::new();
+		while !self.at_eof() {
+			nodes.push(self.stmt()?);
+		}
+		return Ok(nodes);
+	}
+
+	fn stmt(&mut self) -> Result<Node, String> {
+		let node = self.expr()?;
+		self.expect(";")?;
+		Ok(node)
+	}
+
+	fn expr(&mut self) -> Result<Node, String> {
+		return self.assign();
+	}
+
+	fn assign(&mut self) -> Result<Node, String> {
+		let mut node = self.equality()?;
+
+		if self.consume("=") {
+			node = Node {
+				kind: NodeKind::Assign,
+				lhs: Some(Box::new(node)),
+				rhs: Some(Box::new(self.assign()?)),
+				val: None,
+				offset: None,
+			};
+		}
+
+		return Ok(node);
 	}
 
 	fn equality(&mut self) -> Result<Node, String> {
@@ -106,6 +139,7 @@ impl Parser {
 					lhs: Some(Box::new(node)),
 					rhs: Some(Box::new(self.relational()?)),
 					val: None,
+					offset: None,
 				};
 			} else if self.consume("!=") {
 				node = Node {
@@ -113,6 +147,7 @@ impl Parser {
 					lhs: Some(Box::new(node)),
 					rhs: Some(Box::new(self.relational()?)),
 					val: None,
+					offset: None,
 				};
 			} else {
 				return Ok(node);
@@ -130,6 +165,7 @@ impl Parser {
 					lhs: Some(Box::new(node)),
 					rhs: Some(Box::new(self.add()?)),
 					val: None,
+					offset: None,
 				};
 			} else if self.consume("<=") {
 				node = Node {
@@ -137,6 +173,7 @@ impl Parser {
 					lhs: Some(Box::new(node)),
 					rhs: Some(Box::new(self.add()?)),
 					val: None,
+					offset: None,
 				};
 			} else if self.consume(">") {
 				node = Node {
@@ -144,6 +181,7 @@ impl Parser {
 					lhs: Some(Box::new(node)),
 					rhs: Some(Box::new(self.add()?)),
 					val: None,
+					offset: None,
 				};
 			} else if self.consume(">=") {
 				node = Node {
@@ -151,6 +189,7 @@ impl Parser {
 					lhs: Some(Box::new(node)),
 					rhs: Some(Box::new(self.add()?)),
 					val: None,
+					offset: None,
 				};
 			} else {
 				return Ok(node);
@@ -168,6 +207,7 @@ impl Parser {
 					lhs: Some(Box::new(node)),
 					rhs: Some(Box::new(self.mul()?)),
 					val: None,
+					offset: None,
 				};
 				} else if self.consume("-") {
 				node = Node {
@@ -175,6 +215,7 @@ impl Parser {
 					lhs: Some(Box::new(node)),
 					rhs: Some(Box::new(self.mul()?)),
 					val: None,
+					offset: None,
 				};
 			} else {
 				return Ok(node);
@@ -192,6 +233,7 @@ impl Parser {
 					lhs: Some(Box::new(node)),
 					rhs: Some(Box::new(self.unary()?)),
 					val: None,
+					offset: None,
 				};
 			} else if self.consume("/") {
 				node = Node {
@@ -199,6 +241,7 @@ impl Parser {
 					lhs: Some(Box::new(node)),
 					rhs: Some(Box::new(self.unary()?)),
 					val: None,
+					offset: None,
 				};
 			} else {
 				return Ok(node);
@@ -218,9 +261,11 @@ impl Parser {
 					lhs: None,
 					rhs: None,
 					val: Some(0),
+					offset: None,
 				})),
 				rhs: Some(Box::new(self.primary()?)),
 				val: None,
+				offset: None,
 			});
 		} else {
 			return self.primary();
@@ -232,12 +277,23 @@ impl Parser {
 			let node = self.expr()?;
 			self.expect(")")?;
 			Ok(node)
+		} else if self.tokens[self.pos].kind == TokenKind::Ident {
+			let node = Node {
+				kind: NodeKind::Lvar,
+				lhs: None,
+				rhs: None,
+				val: None,
+				offset: Some(8 * (self.tokens[self.pos].str.chars().next().unwrap() as i32 - 'a' as i32 + 1)),
+			};
+			self.pos += 1;
+			Ok(node)
 		} else {
 			Ok(Node {
 				kind: NodeKind::Num,
 				lhs: None,
 				rhs: None,
 				val: Some(self.expect_number()?),
+				offset: None,
 			})
 		}
 	}
