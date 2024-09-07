@@ -4,7 +4,7 @@
 生成規則:
 ```
 program    ::= stmt*
-stmt       ::= expr ";"
+stmt       ::= expr ";" | "return" expr ";"
 expr       ::= assign
 assign     ::= equlatity ("=" assign)?
 equality   ::= relational ("==" relational | "!=" relational)*
