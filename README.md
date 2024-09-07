@@ -1,15 +1,18 @@
 # simple C compiler written in Rust
 
 ## Production rule
-比較演算子をサポートした文法
+生成規則:
 ```
-expr       ::= equality
+program    ::= stmt*
+stmt       ::= expr ";"
+expr       ::= assign
+assign     ::= equlatity ("=" assign)?
 equality   ::= relational ("==" relational | "!=" relational)*
 relational ::= add ("<" add | "<=" add | ">" add | ">=" add)*
 add        ::= mul ("+" mul | "-" mul)*
 mul        ::= unary ("*" unary | "/" unary)*
 unary      ::= ("+" | "-")? primary
-primary    ::= num | "(" expr ")"
+primary    ::= num | ident | "(" expr ")"
 ```
 
 ## Acknowledgments
