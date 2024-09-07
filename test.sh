@@ -55,4 +55,7 @@ assert 42 "variable=42; variable;"
 assert 42 "variable=42; another_variable=variable; another_variable;"
 assert 42 "a=13; hoge=21; fuga=8; a=42; a;"
 
+assert 42 "return 42;"
+assert 42 "hello=42; world=12; return hello; world;"
+
 echo OK
