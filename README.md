@@ -5,9 +5,10 @@
 ```
 program    ::= stmt*
 stmt       ::= expr ";"
+             | "{" stmt* "}"
              | "if" "(" expr ")" stmt ("else" stmt)?
-						 | "while" "(" expr ")" stmt
-						 | "for" "(" expt? ";" expr? ";" expr? ")" stmt
+             | "while" "(" expr ")" stmt
+             | "for" "(" expt? ";" expr? ";" expr? ")" stmt
              | "return" expr ";"
 expr       ::= assign
 assign     ::= equlatity ("=" assign)?
