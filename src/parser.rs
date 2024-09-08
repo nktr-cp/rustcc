@@ -22,6 +22,7 @@ pub enum NodeKind {
     Ge,
     Num,
 		Block,
+		Fncall,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -45,96 +46,26 @@ pub struct Node {
 impl Node {
 	pub fn print(&self) {
 		match self.kind {
-			NodeKind::Add => {
-				println!("Add");
-				self.lhs.as_ref().unwrap().print();
-				self.rhs.as_ref().unwrap().print();
-			}
-			NodeKind::Sub => {
-				println!("Sub");
-				self.lhs.as_ref().unwrap().print();
-				self.rhs.as_ref().unwrap().print();
-			}
-			NodeKind::Mul => {
-				println!("Mul");
-				self.lhs.as_ref().unwrap().print();
-				self.rhs.as_ref().unwrap().print();
-			}
-			NodeKind::Div => {
-				println!("Div");
-				self.lhs.as_ref().unwrap().print();
-				self.rhs.as_ref().unwrap().print();
-			}
-			NodeKind::Num => {
-				println!("Num: {}", self.val.unwrap());
-			}
-			NodeKind::For => {
-				println!("For");
-				self.lhs.as_ref().unwrap().print();
-				self.rhs.as_ref().unwrap().print();
-			}
-			NodeKind::While => {
-				println!("While");
-				self.lhs.as_ref().unwrap().print();
-				self.rhs.as_ref().unwrap().print();
-			}
-			NodeKind::If => {
-				println!("If");
-				self.lhs.as_ref().unwrap().print();
-				self.rhs.as_ref().unwrap().print();
-			}
-			NodeKind::Else => {
-				println!("Else");
-				self.lhs.as_ref().unwrap().print();
-				self.rhs.as_ref().unwrap().print();
-			}
-			NodeKind::Eq => {
-				println!("Eq");
-				self.lhs.as_ref().unwrap().print();
-				self.rhs.as_ref().unwrap().print();
-			}
-			NodeKind::Nq => {
-				println!("Nq");
-				self.lhs.as_ref().unwrap().print();
-				self.rhs.as_ref().unwrap().print();
-			}
-			NodeKind::Lt => {
-				println!("Lt");
-				self.lhs.as_ref().unwrap().print();
-				self.rhs.as_ref().unwrap().print();
-			}
-			NodeKind::Le => {
-				println!("Le");
-				self.lhs.as_ref().unwrap().print();
-				self.rhs.as_ref().unwrap().print();
-			}
-			NodeKind::Gt => {
-				println!("Gt");
-				self.lhs.as_ref().unwrap().print();
-				self.rhs.as_ref().unwrap().print();
-			}
-			NodeKind::Ge => {
-				println!("Ge");
-				self.lhs.as_ref().unwrap().print();
-				self.rhs.as_ref().unwrap().print();
-			}
-			NodeKind::Assign => {
-				println!("Assign");
-				self.lhs.as_ref().unwrap().print();
-				self.rhs.as_ref().unwrap().print();
-			}
-			NodeKind::Lvar => {
-				println!("Lvar: {}", self.lvar.as_ref().unwrap().name);
-			}
-			NodeKind::Return => {
-				println!("Return");
-				self.lhs.as_ref().unwrap().print();
-			}
-			NodeKind::Block => {
-				println!("Block");
-				self.lhs.as_ref().unwrap().print();
-				self.rhs.as_ref().unwrap().print();
-			}
+			NodeKind::Add => { println!("Add"); self.lhs.as_ref().unwrap().print(); self.rhs.as_ref().unwrap().print(); }
+			NodeKind::Sub => { println!("Sub"); self.lhs.as_ref().unwrap().print(); self.rhs.as_ref().unwrap().print(); }
+			NodeKind::Mul => { println!("Mul"); self.lhs.as_ref().unwrap().print(); self.rhs.as_ref().unwrap().print(); }
+			NodeKind::Div => { println!("Div"); self.lhs.as_ref().unwrap().print(); self.rhs.as_ref().unwrap().print(); }
+			NodeKind::Assign => { println!("Assign"); self.lhs.as_ref().unwrap().print(); self.rhs.as_ref().unwrap().print(); }
+			NodeKind::Lvar => { println!("Lvar: {}", self.lvar.as_ref().unwrap().name); }
+			NodeKind::Return => { println!("Return"); self.lhs.as_ref().unwrap().print(); }
+			NodeKind::For => { println!("For"); self.lhs.as_ref().unwrap().print(); self.rhs.as_ref().unwrap().print(); }
+			NodeKind::While => { println!("While"); self.lhs.as_ref().unwrap().print(); self.rhs.as_ref().unwrap().print(); }
+			NodeKind::If => { println!("If"); self.lhs.as_ref().unwrap().print(); self.rhs.as_ref().unwrap().print(); }
+			NodeKind::Else => { println!("Else"); self.lhs.as_ref().unwrap().print(); self.rhs.as_ref().unwrap().print(); }
+			NodeKind::Eq => { println!("Eq"); self.lhs.as_ref().unwrap().print(); self.rhs.as_ref().unwrap().print(); }
+			NodeKind::Nq => { println!("Nq"); self.lhs.as_ref().unwrap().print(); self.rhs.as_ref().unwrap().print(); }
+			NodeKind::Lt => { println!("Lt"); self.lhs.as_ref().unwrap().print(); self.rhs.as_ref().unwrap().print(); }
+			NodeKind::Le => { println!("Le"); self.lhs.as_ref().unwrap().print(); self.rhs.as_ref().unwrap().print(); }
+			NodeKind::Gt => { println!("Gt"); self.lhs.as_ref().unwrap().print(); self.rhs.as_ref().unwrap().print(); }
+			NodeKind::Ge => { println!("Ge"); self.lhs.as_ref().unwrap().print(); self.rhs.as_ref().unwrap().print(); }
+			NodeKind::Num => { println!("Num: {}", self.val.unwrap()); }
+			NodeKind::Block => { println!("Block"); for stmt in self.stmts.as_ref().unwrap() { stmt.print(); } }
+			NodeKind::Fncall => { println!("Fncall: {}", self.lvar.as_ref().unwrap().name); for arg in self.stmts.as_ref().unwrap() { arg.print(); } }
 		}
 	}
 }
@@ -531,14 +462,38 @@ impl Parser {
         } else if self.tokens[self.pos].kind == TokenKind::Ident {
             let lvar = self.find_or_create_lvar(&self.tokens[self.pos].str.clone());
             self.pos += 1;
-            Ok(Node {
-                kind: NodeKind::Lvar,
-                lhs: None,
-                rhs: None,
-                val: None,
-                lvar: Some(lvar),
-								stmts: None,
-            })
+						if self.consume("(") {
+							let mut args = Vec::new();
+							if self.consume(")") {
+								Ok(Node {
+									kind: NodeKind::Fncall,
+									lhs: None,
+									rhs: None,
+									val: None,
+									lvar: Some(lvar),
+									stmts: Some(args),
+								})
+							} else {
+								args = self.arglist()?;
+								Ok(Node {
+									kind: NodeKind::Fncall,
+									lhs: None,
+									rhs: None,
+									val: None,
+									lvar: Some(lvar),
+									stmts: Some(args),
+								})
+							}
+						} else {
+							Ok(Node {
+									kind: NodeKind::Lvar,
+									lhs: None,
+									rhs: None,
+									val: None,
+									lvar: Some(lvar),
+									stmts: None,
+							})
+						}
         } else {
             Ok(Node {
                 kind: NodeKind::Num,
@@ -550,4 +505,20 @@ impl Parser {
             })
         }
     }
+
+		fn arglist(&mut self) -> Result<Vec<Node>, String> {
+			let mut args = Vec::new();
+			args.push(self.expr()?);
+
+			loop {
+				if self.consume(",") {
+					args.push(self.expr()?);
+				} else {
+					break;
+				}
+			}
+			
+			self.expect(")")?;
+			Ok(args)
+		}
 }

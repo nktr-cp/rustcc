@@ -97,6 +97,22 @@ pub fn gen(node: &Node, id: &mut i32) {
 					}
 				}
 			}
+			NodeKind::Fncall => {
+				const REGS: [&str; 6] = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
+
+				let args = node.stmts.as_ref().unwrap();
+				for (i, arg) in args.iter().enumerate() {
+					gen(arg, id);
+					println!("  pop {}", REGS[i]);
+				}
+				println!("  mov rax, {}", args.len());
+
+				// rspの位置を調整
+				println!("  and rsp, -16");
+				println!("  call {}", node.lvar.clone().unwrap().name);
+
+				println!("  push rax");
+			}
 			_ => {
 				gen(node.lhs.as_ref().unwrap(), id);
 				gen(node.rhs.as_ref().unwrap(), id);

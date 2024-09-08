@@ -17,6 +17,78 @@ assert() {
   fi
 }
 
+fib() {
+	expected="$1"
+	input="$2"
+
+	echo "int fibonacchi(int n) {
+		if (n <= 1) {
+			return n;
+		}
+		return fibonacchi(n-1) + fibonacchi(n-2);
+	}" > fib.c
+
+	cargo run -- "$input" > tmp.s
+	cc -c fib.c
+	cc -c tmp.s
+	cc tmp.o fib.o -o tmp
+	./tmp
+	actual="$?"
+
+	if [ "$actual" = "$expected" ]; then
+		echo "$input => $actual"
+	else
+		echo "$input => $expected expected, but got $actual"
+		exit 1
+	fi
+}
+
+add() {
+	expected="$1"
+	input="$2"
+
+	echo "int add(int a, int b) {
+		return a+b;
+	}" > add.c
+
+	cargo run -- "$input" > tmp.s
+	cc -c add.c
+	cc -c tmp.s
+	cc tmp.o add.o -o tmp
+	./tmp
+	actual="$?"
+
+	if [ "$actual" = "$expected" ]; then
+		echo "$input => $actual"
+	else
+		echo "$input => $expected expected, but got $actual"
+		exit 1
+	fi
+}
+
+no_arg() {
+	expected="$1"
+	input="$2"
+
+	echo "int no_arg() {
+		return $expected;
+	}" > no_arg.c
+
+	cargo run -- "$input" > tmp.s
+	cc -c no_arg.c
+	cc -c tmp.s
+	cc tmp.o no_arg.o -o tmp
+	./tmp
+	actual="$?"
+
+	if [ "$actual" = "$expected" ]; then
+		echo "$input => $actual"
+	else
+		echo "$input => $expected expected, but got $actual"
+		exit 1
+	fi
+}
+
 assert 0 "0;"
 assert 42 "42;"
 
@@ -101,5 +173,11 @@ for (i=0; i<42; i=i+1) {
 }
 return a;
 "
+
+no_arg 42 "return no_arg();"
+fib 55 "return fibonacchi(10);"
+add 42 "add(20, 22);"
+
+rm -f tmp* *.s *.c *.o 
 
 echo OK
