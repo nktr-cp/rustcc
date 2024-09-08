@@ -5,6 +5,10 @@ pub enum TokenKind {
     Reserved,
     Ident,
     Return,
+		For,
+		While,
+		If,
+		Else,
     Num,
     Eof,
 }
@@ -86,21 +90,56 @@ pub fn tokenize(input: &str) -> Vec<Token> {
                 ident.push(c);
                 chars.next();
             }
-            if ident == "return" {
-                tokens.push(Token {
-                    kind: TokenKind::Return,
-                    val: None,
-                    str: ident,
-                });
-                continue;
-            } else {
-                tokens.push(Token {
-                    kind: TokenKind::Ident,
-                    val: None,
-                    str: ident,
-                });
-                continue;
-            }
+						match ident.as_str() {
+							"return" => {
+								tokens.push(Token {
+										kind: TokenKind::Return,
+										val: None,
+										str: ident,
+								});
+								continue;
+							},
+							"for" => {
+								tokens.push(Token {
+										kind: TokenKind::For,
+										val: None,
+										str: ident,
+								});
+								continue;
+							},
+							"while" => {
+								tokens.push(Token {
+										kind: TokenKind::While,
+										val: None,
+										str: ident,
+								});
+								continue;
+							},
+							"if" => {
+								tokens.push(Token {
+										kind: TokenKind::If,
+										val: None,
+										str: ident,
+								});
+								continue;
+							},
+							"else" => {
+								tokens.push(Token {
+										kind: TokenKind::Else,
+										val: None,
+										str: ident,
+								});
+								continue;
+							},
+							_ => {
+								tokens.push(Token {
+										kind: TokenKind::Ident,
+										val: None,
+										str: ident,
+								});
+								continue;
+							}
+						}
         }
 
         error::error("トークナイズできません");

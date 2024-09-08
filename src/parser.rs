@@ -10,6 +10,10 @@ pub enum NodeKind {
     Assign,
     Lvar,
     Return,
+		For,
+		While,
+		If,
+		Else,
     Eq,
     Nq,
     Lt,
@@ -62,6 +66,68 @@ pub struct Node {
 // 			NodeKind::Num => {
 // 				println!("Num: {}", self.val.unwrap());
 // 			}
+// 			NodeKind::For => {
+// 				println!("For");
+// 				self.lhs.as_ref().unwrap().print();
+// 				self.rhs.as_ref().unwrap().print();
+// 			}
+// 			NodeKind::While => {
+// 				println!("While");
+// 				self.lhs.as_ref().unwrap().print();
+// 				self.rhs.as_ref().unwrap().print();
+// 			}
+// 			NodeKind::If => {
+// 				println!("If");
+// 				self.lhs.as_ref().unwrap().print();
+// 				self.rhs.as_ref().unwrap().print();
+// 			}
+// 			NodeKind::Else => {
+// 				println!("Else");
+// 				self.lhs.as_ref().unwrap().print();
+// 				self.rhs.as_ref().unwrap().print();
+// 			}
+// 			NodeKind::Eq => {
+// 				println!("Eq");
+// 				self.lhs.as_ref().unwrap().print();
+// 				self.rhs.as_ref().unwrap().print();
+// 			}
+// 			NodeKind::Nq => {
+// 				println!("Nq");
+// 				self.lhs.as_ref().unwrap().print();
+// 				self.rhs.as_ref().unwrap().print();
+// 			}
+// 			NodeKind::Lt => {
+// 				println!("Lt");
+// 				self.lhs.as_ref().unwrap().print();
+// 				self.rhs.as_ref().unwrap().print();
+// 			}
+// 			NodeKind::Le => {
+// 				println!("Le");
+// 				self.lhs.as_ref().unwrap().print();
+// 				self.rhs.as_ref().unwrap().print();
+// 			}
+// 			NodeKind::Gt => {
+// 				println!("Gt");
+// 				self.lhs.as_ref().unwrap().print();
+// 				self.rhs.as_ref().unwrap().print();
+// 			}
+// 			NodeKind::Ge => {
+// 				println!("Ge");
+// 				self.lhs.as_ref().unwrap().print();
+// 				self.rhs.as_ref().unwrap().print();
+// 			}
+// 			NodeKind::Assign => {
+// 				println!("Assign");
+// 				self.lhs.as_ref().unwrap().print();
+// 				self.rhs.as_ref().unwrap().print();
+// 			}
+// 			NodeKind::Lvar => {
+// 				println!("Lvar: {}", self.lvar.as_ref().unwrap().name);
+// 			}
+// 			NodeKind::Return => {
+// 				println!("Return");
+// 				self.lhs.as_ref().unwrap().print();
+// 			}
 // 		}
 // 	}
 // }
@@ -94,10 +160,8 @@ impl Parser {
     }
 
     fn consume(&mut self, op: &str) -> bool {
-        if self.tokens[self.pos].kind != TokenKind::Reserved
-            || self.tokens[self.pos].str != op.to_string()
-        {
-            return false;
+        if self.tokens[self.pos].str != op.to_string() {
+          return false;
         }
         self.pos += 1;
         true
@@ -139,10 +203,7 @@ impl Parser {
 
     fn stmt(&mut self) -> Result<Node, String> {
         let node: Node;
-				// TODO: consumeがreturnを受け付けられない
-        // if self.consume("return") {
-				if self.tokens[self.pos].kind == TokenKind::Return {
-					self.pos += 1;
+				if self.consume("return") {
 					node = Node {
 							kind: NodeKind::Return,
 							lhs: Some(Box::new(self.expr()?)),
@@ -150,13 +211,107 @@ impl Parser {
 							val: None,
 							lvar: None,
 					};
-        } else {
-            node = self.expr()?;
-        }
-
-        self.expect(";")?;
-        Ok(node)
-    }
+					self.expect(";")?;
+        } else if self.consume("for") {
+					let mut init = Node {
+							kind: NodeKind::Num,
+							lhs: None,
+							rhs: None,
+							val: Some(0),
+							lvar: None,
+					};
+					let mut cond = Node {
+							kind: NodeKind::Num,
+							lhs: None,
+							rhs: None,
+							val: Some(1), // default condition is true
+							lvar: None,
+					};
+					let mut inc = Node {
+							kind: NodeKind::Num,
+							lhs: None,
+							rhs: None,
+							val: Some(0),
+							lvar: None,
+					};
+					self.expect("(")?;
+					if !self.consume(";") {
+						init = self.expr()?;
+						self.expect(";")?;
+					}
+					if !self.consume(";") {
+						cond = self.expr()?;
+						self.expect(";")?;
+					}
+					if !self.consume(")") {
+						inc = self.expr()?;
+						self.expect(")")?;
+					}
+					node = Node {
+							kind: NodeKind::For,
+							lhs: Some(Box::new(init)),
+							rhs: Some(Box::new(Node {
+									kind: NodeKind::For,
+									lhs: Some(Box::new(cond)),
+									rhs: Some(Box::new(Node {
+											kind: NodeKind::For,
+											lhs: Some(Box::new(inc)),
+											rhs: Some(Box::new(self.stmt()?)),
+											val: None,
+											lvar: None,
+									})),
+									val: None,
+									lvar: None,
+							})),
+							val: None,
+							lvar: None,
+					};
+				} else if self.consume("while") {
+					self.expect("(")?;
+					let cond = self.expr()?;
+					self.expect(")")?;
+					node = Node {
+							kind: NodeKind::While,
+							lhs: Some(Box::new(cond)),
+							rhs: Some(Box::new(self.stmt()?)),
+							val: None,
+							lvar: None,
+					};
+				} else if self.consume("if") {
+					self.expect("(")?;
+					let cond = self.expr()?;
+					self.expect(")")?;
+					let then = self.stmt()?;
+					if self.consume("else") {
+						let els = self.stmt()?;
+						node = Node {
+								kind: NodeKind::If,
+								lhs: Some(Box::new(cond)),
+								rhs: Some(Box::new(Node {
+										kind: NodeKind::Else,
+										lhs: Some(Box::new(then)),
+										rhs: Some(Box::new(els)),
+										val: None,
+										lvar: None,
+								})),
+								val: None,
+								lvar: None,
+						};
+					} else {
+						node = Node {
+								kind: NodeKind::If,
+								lhs: Some(Box::new(cond)),
+								rhs: Some(Box::new(then)),
+								val: None,
+								lvar: None,
+						};
+					}
+				} else {
+					node = self.expr()?;
+					self.expect(";")?;
+				}
+				Ok(node)
+		}
 
     fn expr(&mut self) -> Result<Node, String> {
         return self.assign();

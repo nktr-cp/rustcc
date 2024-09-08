@@ -25,8 +25,9 @@ fn main() {
     println!("  mov rbp, rsp");
     println!("  sub rsp, {}", parser.locals.len() * 8 + 8);
 
+		let mut id = 0;
     for node in code.iter() {
-        gen::gen(node);
+        gen::gen(node, &mut id);
         println!("  pop rax");
     }
 
