@@ -4,7 +4,11 @@
 生成規則:
 ```
 program    ::= stmt*
-stmt       ::= expr ";" | "return" expr ";"
+stmt       ::= expr ";"
+             | "if" "(" expr ")" stmt ("else" stmt)?
+						 | "while" "(" expr ")" stmt
+						 | "for" "(" expt? ";" expr? ";" expr? ")" stmt
+             | "return" expr ";"
 expr       ::= assign
 assign     ::= equlatity ("=" assign)?
 equality   ::= relational ("==" relational | "!=" relational)*
