@@ -18,8 +18,9 @@ add        ::= mul ("+" mul | "-" mul)*
 mul        ::= unary ("*" unary | "/" unary)*
 unary      ::= ("+" | "-")? primary
 primary    ::= num
-             | ident ("(" ")")?
+             | ident ("(" arglist? ")")?
              | "(" expr ")"
+arglist    ::= expr ("," expr)*
 ```
 
 ## Acknowledgments
