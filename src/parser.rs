@@ -10,10 +10,10 @@ pub enum NodeKind {
     Assign,
     Lvar,
     Return,
-		For,
-		While,
-		If,
-		Else,
+    For,
+    While,
+    If,
+    Else,
     Eq,
     Nq,
     Lt,
@@ -21,8 +21,8 @@ pub enum NodeKind {
     Gt,
     Ge,
     Num,
-		Block,
-		Fncall,
+    Block,
+    Fncall,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -38,36 +38,113 @@ pub struct Node {
     pub rhs: Option<Box<Node>>,
     pub val: Option<i32>,
     pub lvar: Option<LVar>,
-		pub stmts: Option<Vec<Node>>, // for block
+    pub stmts: Option<Vec<Node>>, // for block
 }
 
 // debug
 #[allow(dead_code)]
 impl Node {
-	pub fn print(&self) {
-		match self.kind {
-			NodeKind::Add => { println!("Add"); self.lhs.as_ref().unwrap().print(); self.rhs.as_ref().unwrap().print(); }
-			NodeKind::Sub => { println!("Sub"); self.lhs.as_ref().unwrap().print(); self.rhs.as_ref().unwrap().print(); }
-			NodeKind::Mul => { println!("Mul"); self.lhs.as_ref().unwrap().print(); self.rhs.as_ref().unwrap().print(); }
-			NodeKind::Div => { println!("Div"); self.lhs.as_ref().unwrap().print(); self.rhs.as_ref().unwrap().print(); }
-			NodeKind::Assign => { println!("Assign"); self.lhs.as_ref().unwrap().print(); self.rhs.as_ref().unwrap().print(); }
-			NodeKind::Lvar => { println!("Lvar: {}", self.lvar.as_ref().unwrap().name); }
-			NodeKind::Return => { println!("Return"); self.lhs.as_ref().unwrap().print(); }
-			NodeKind::For => { println!("For"); self.lhs.as_ref().unwrap().print(); self.rhs.as_ref().unwrap().print(); }
-			NodeKind::While => { println!("While"); self.lhs.as_ref().unwrap().print(); self.rhs.as_ref().unwrap().print(); }
-			NodeKind::If => { println!("If"); self.lhs.as_ref().unwrap().print(); self.rhs.as_ref().unwrap().print(); }
-			NodeKind::Else => { println!("Else"); self.lhs.as_ref().unwrap().print(); self.rhs.as_ref().unwrap().print(); }
-			NodeKind::Eq => { println!("Eq"); self.lhs.as_ref().unwrap().print(); self.rhs.as_ref().unwrap().print(); }
-			NodeKind::Nq => { println!("Nq"); self.lhs.as_ref().unwrap().print(); self.rhs.as_ref().unwrap().print(); }
-			NodeKind::Lt => { println!("Lt"); self.lhs.as_ref().unwrap().print(); self.rhs.as_ref().unwrap().print(); }
-			NodeKind::Le => { println!("Le"); self.lhs.as_ref().unwrap().print(); self.rhs.as_ref().unwrap().print(); }
-			NodeKind::Gt => { println!("Gt"); self.lhs.as_ref().unwrap().print(); self.rhs.as_ref().unwrap().print(); }
-			NodeKind::Ge => { println!("Ge"); self.lhs.as_ref().unwrap().print(); self.rhs.as_ref().unwrap().print(); }
-			NodeKind::Num => { println!("Num: {}", self.val.unwrap()); }
-			NodeKind::Block => { println!("Block"); for stmt in self.stmts.as_ref().unwrap() { stmt.print(); } }
-			NodeKind::Fncall => { println!("Fncall: {}", self.lvar.as_ref().unwrap().name); for arg in self.stmts.as_ref().unwrap() { arg.print(); } }
-		}
-	}
+    pub fn print(&self) {
+        match self.kind {
+            NodeKind::Add => {
+                println!("Add");
+                self.lhs.as_ref().unwrap().print();
+                self.rhs.as_ref().unwrap().print();
+            }
+            NodeKind::Sub => {
+                println!("Sub");
+                self.lhs.as_ref().unwrap().print();
+                self.rhs.as_ref().unwrap().print();
+            }
+            NodeKind::Mul => {
+                println!("Mul");
+                self.lhs.as_ref().unwrap().print();
+                self.rhs.as_ref().unwrap().print();
+            }
+            NodeKind::Div => {
+                println!("Div");
+                self.lhs.as_ref().unwrap().print();
+                self.rhs.as_ref().unwrap().print();
+            }
+            NodeKind::Assign => {
+                println!("Assign");
+                self.lhs.as_ref().unwrap().print();
+                self.rhs.as_ref().unwrap().print();
+            }
+            NodeKind::Lvar => {
+                println!("Lvar: {}", self.lvar.as_ref().unwrap().name);
+            }
+            NodeKind::Return => {
+                println!("Return");
+                self.lhs.as_ref().unwrap().print();
+            }
+            NodeKind::For => {
+                println!("For");
+                self.lhs.as_ref().unwrap().print();
+                self.rhs.as_ref().unwrap().print();
+            }
+            NodeKind::While => {
+                println!("While");
+                self.lhs.as_ref().unwrap().print();
+                self.rhs.as_ref().unwrap().print();
+            }
+            NodeKind::If => {
+                println!("If");
+                self.lhs.as_ref().unwrap().print();
+                self.rhs.as_ref().unwrap().print();
+            }
+            NodeKind::Else => {
+                println!("Else");
+                self.lhs.as_ref().unwrap().print();
+                self.rhs.as_ref().unwrap().print();
+            }
+            NodeKind::Eq => {
+                println!("Eq");
+                self.lhs.as_ref().unwrap().print();
+                self.rhs.as_ref().unwrap().print();
+            }
+            NodeKind::Nq => {
+                println!("Nq");
+                self.lhs.as_ref().unwrap().print();
+                self.rhs.as_ref().unwrap().print();
+            }
+            NodeKind::Lt => {
+                println!("Lt");
+                self.lhs.as_ref().unwrap().print();
+                self.rhs.as_ref().unwrap().print();
+            }
+            NodeKind::Le => {
+                println!("Le");
+                self.lhs.as_ref().unwrap().print();
+                self.rhs.as_ref().unwrap().print();
+            }
+            NodeKind::Gt => {
+                println!("Gt");
+                self.lhs.as_ref().unwrap().print();
+                self.rhs.as_ref().unwrap().print();
+            }
+            NodeKind::Ge => {
+                println!("Ge");
+                self.lhs.as_ref().unwrap().print();
+                self.rhs.as_ref().unwrap().print();
+            }
+            NodeKind::Num => {
+                println!("Num: {}", self.val.unwrap());
+            }
+            NodeKind::Block => {
+                println!("Block");
+                for stmt in self.stmts.as_ref().unwrap() {
+                    stmt.print();
+                }
+            }
+            NodeKind::Fncall => {
+                println!("Fncall: {}", self.lvar.as_ref().unwrap().name);
+                for arg in self.stmts.as_ref().unwrap() {
+                    arg.print();
+                }
+            }
+        }
+    }
 }
 
 pub struct Parser {
@@ -99,7 +176,7 @@ impl Parser {
 
     fn consume(&mut self, op: &str) -> bool {
         if self.tokens[self.pos].str != op.to_string() {
-          return false;
+            return false;
         }
         self.pos += 1;
         true
@@ -141,142 +218,142 @@ impl Parser {
 
     fn stmt(&mut self) -> Result<Node, String> {
         let node: Node;
-				if self.consume("{") {
-					let mut stmts = Vec::new();
-					loop {
-						if self.consume("}") {
-							break;
-						}
-						stmts.push(self.stmt()?);
-					}
-					node = Node {
-						kind: NodeKind::Block,
-						lhs: None,
-						rhs: None,
-						val: None,
-						lvar: None,
-						stmts: Some(stmts),
-					}
-				} else if self.consume("return") {
-					node = Node {
-							kind: NodeKind::Return,
-							lhs: Some(Box::new(self.expr()?)),
-							rhs: None,
-							val: None,
-							lvar: None,
-							stmts: None,
-					};
-					self.expect(";")?;
+        if self.consume("{") {
+            let mut stmts = Vec::new();
+            loop {
+                if self.consume("}") {
+                    break;
+                }
+                stmts.push(self.stmt()?);
+            }
+            node = Node {
+                kind: NodeKind::Block,
+                lhs: None,
+                rhs: None,
+                val: None,
+                lvar: None,
+                stmts: Some(stmts),
+            }
+        } else if self.consume("return") {
+            node = Node {
+                kind: NodeKind::Return,
+                lhs: Some(Box::new(self.expr()?)),
+                rhs: None,
+                val: None,
+                lvar: None,
+                stmts: None,
+            };
+            self.expect(";")?;
         } else if self.consume("for") {
-					let mut init = Node {
-							kind: NodeKind::Num,
-							lhs: None,
-							rhs: None,
-							val: Some(0),
-							lvar: None,
-							stmts: None,
-					};
-					let mut cond = Node {
-							kind: NodeKind::Num,
-							lhs: None,
-							rhs: None,
-							val: Some(1), // default condition is true
-							lvar: None,
-							stmts: None,
-					};
-					let mut inc = Node {
-							kind: NodeKind::Num,
-							lhs: None,
-							rhs: None,
-							val: Some(0),
-							lvar: None,
-							stmts: None,
-					};
-					self.expect("(")?;
-					if !self.consume(";") {
-						init = self.expr()?;
-						self.expect(";")?;
-					}
-					if !self.consume(";") {
-						cond = self.expr()?;
-						self.expect(";")?;
-					}
-					if !self.consume(")") {
-						inc = self.expr()?;
-						self.expect(")")?;
-					}
-					node = Node {
-							kind: NodeKind::For,
-							lhs: Some(Box::new(init)),
-							rhs: Some(Box::new(Node {
-									kind: NodeKind::For,
-									lhs: Some(Box::new(cond)),
-									rhs: Some(Box::new(Node {
-											kind: NodeKind::For,
-											lhs: Some(Box::new(inc)),
-											rhs: Some(Box::new(self.stmt()?)),
-											val: None,
-											lvar: None,
-											stmts: None,
-									})),
-									val: None,
-									lvar: None,
-									stmts: None,
-							})),
-							val: None,
-							lvar: None,
-							stmts: None,
-					};
-				} else if self.consume("while") {
-					self.expect("(")?;
-					let cond = self.expr()?;
-					self.expect(")")?;
-					node = Node {
-							kind: NodeKind::While,
-							lhs: Some(Box::new(cond)),
-							rhs: Some(Box::new(self.stmt()?)),
-							val: None,
-							lvar: None,
-							stmts: None,
-					};
-				} else if self.consume("if") {
-					self.expect("(")?;
-					let cond = self.expr()?;
-					self.expect(")")?;
-					let then = self.stmt()?;
-					if self.consume("else") {
-						let els = self.stmt()?;
-						node = Node {
-								kind: NodeKind::If,
-								lhs: Some(Box::new(cond)),
-								rhs: Some(Box::new(Node {
-										kind: NodeKind::Else,
-										lhs: Some(Box::new(then)),
-										rhs: Some(Box::new(els)),
-										val: None,
-										lvar: None,
-										stmts: None,
-								})),
-								val: None,
-								lvar: None,
-								stmts: None,
-						};
-					} else {
-						node = Node {
-								kind: NodeKind::If,
-								lhs: Some(Box::new(cond)),
-								rhs: Some(Box::new(then)),
-								val: None,
-								lvar: None,
-								stmts: None,
-						};
-					}
-				} else {
-					node = self.expr()?;
-					self.expect(";")?;
-				}
-				Ok(node)
-		}
+            let mut init = Node {
+                kind: NodeKind::Num,
+                lhs: None,
+                rhs: None,
+                val: Some(0),
+                lvar: None,
+                stmts: None,
+            };
+            let mut cond = Node {
+                kind: NodeKind::Num,
+                lhs: None,
+                rhs: None,
+                val: Some(1), // default condition is true
+                lvar: None,
+                stmts: None,
+            };
+            let mut inc = Node {
+                kind: NodeKind::Num,
+                lhs: None,
+                rhs: None,
+                val: Some(0),
+                lvar: None,
+                stmts: None,
+            };
+            self.expect("(")?;
+            if !self.consume(";") {
+                init = self.expr()?;
+                self.expect(";")?;
+            }
+            if !self.consume(";") {
+                cond = self.expr()?;
+                self.expect(";")?;
+            }
+            if !self.consume(")") {
+                inc = self.expr()?;
+                self.expect(")")?;
+            }
+            node = Node {
+                kind: NodeKind::For,
+                lhs: Some(Box::new(init)),
+                rhs: Some(Box::new(Node {
+                    kind: NodeKind::For,
+                    lhs: Some(Box::new(cond)),
+                    rhs: Some(Box::new(Node {
+                        kind: NodeKind::For,
+                        lhs: Some(Box::new(inc)),
+                        rhs: Some(Box::new(self.stmt()?)),
+                        val: None,
+                        lvar: None,
+                        stmts: None,
+                    })),
+                    val: None,
+                    lvar: None,
+                    stmts: None,
+                })),
+                val: None,
+                lvar: None,
+                stmts: None,
+            };
+        } else if self.consume("while") {
+            self.expect("(")?;
+            let cond = self.expr()?;
+            self.expect(")")?;
+            node = Node {
+                kind: NodeKind::While,
+                lhs: Some(Box::new(cond)),
+                rhs: Some(Box::new(self.stmt()?)),
+                val: None,
+                lvar: None,
+                stmts: None,
+            };
+        } else if self.consume("if") {
+            self.expect("(")?;
+            let cond = self.expr()?;
+            self.expect(")")?;
+            let then = self.stmt()?;
+            if self.consume("else") {
+                let els = self.stmt()?;
+                node = Node {
+                    kind: NodeKind::If,
+                    lhs: Some(Box::new(cond)),
+                    rhs: Some(Box::new(Node {
+                        kind: NodeKind::Else,
+                        lhs: Some(Box::new(then)),
+                        rhs: Some(Box::new(els)),
+                        val: None,
+                        lvar: None,
+                        stmts: None,
+                    })),
+                    val: None,
+                    lvar: None,
+                    stmts: None,
+                };
+            } else {
+                node = Node {
+                    kind: NodeKind::If,
+                    lhs: Some(Box::new(cond)),
+                    rhs: Some(Box::new(then)),
+                    val: None,
+                    lvar: None,
+                    stmts: None,
+                };
+            }
+        } else {
+            node = self.expr()?;
+            self.expect(";")?;
+        }
+        Ok(node)
+    }
 
     fn expr(&mut self) -> Result<Node, String> {
         return self.assign();
@@ -292,7 +369,7 @@ impl Parser {
                 rhs: Some(Box::new(self.assign()?)),
                 val: None,
                 lvar: None,
-								stmts: None,
+                stmts: None,
             };
         }
 
@@ -310,7 +387,7 @@ impl Parser {
                     rhs: Some(Box::new(self.relational()?)),
                     val: None,
                     lvar: None,
-										stmts: None,
+                    stmts: None,
                 };
             } else if self.consume("!=") {
                 node = Node {
@@ -319,7 +396,7 @@ impl Parser {
                     rhs: Some(Box::new(self.relational()?)),
                     val: None,
                     lvar: None,
-										stmts: None,
+                    stmts: None,
                 };
             } else {
                 return Ok(node);
@@ -338,7 +415,7 @@ impl Parser {
                     rhs: Some(Box::new(self.add()?)),
                     val: None,
                     lvar: None,
-										stmts: None,
+                    stmts: None,
                 };
             } else if self.consume("<=") {
                 node = Node {
@@ -347,7 +424,7 @@ impl Parser {
                     rhs: Some(Box::new(self.add()?)),
                     val: None,
                     lvar: None,
-										stmts: None,
+                    stmts: None,
                 };
             } else if self.consume(">") {
                 node = Node {
@@ -356,7 +433,7 @@ impl Parser {
                     rhs: Some(Box::new(self.add()?)),
                     val: None,
                     lvar: None,
-										stmts: None,
+                    stmts: None,
                 };
             } else if self.consume(">=") {
                 node = Node {
@@ -365,7 +442,7 @@ impl Parser {
                     rhs: Some(Box::new(self.add()?)),
                     val: None,
                     lvar: None,
-										stmts: None,
+                    stmts: None,
                 };
             } else {
                 return Ok(node);
@@ -384,7 +461,7 @@ impl Parser {
                     rhs: Some(Box::new(self.mul()?)),
                     val: None,
                     lvar: None,
-										stmts: None,
+                    stmts: None,
                 };
             } else if self.consume("-") {
                 node = Node {
@@ -393,7 +470,7 @@ impl Parser {
                     rhs: Some(Box::new(self.mul()?)),
                     val: None,
                     lvar: None,
-										stmts: None,
+                    stmts: None,
                 };
             } else {
                 return Ok(node);
@@ -412,7 +489,7 @@ impl Parser {
                     rhs: Some(Box::new(self.unary()?)),
                     val: None,
                     lvar: None,
-										stmts: None,
+                    stmts: None,
                 };
             } else if self.consume("/") {
                 node = Node {
@@ -421,7 +498,7 @@ impl Parser {
                     rhs: Some(Box::new(self.unary()?)),
                     val: None,
                     lvar: None,
-										stmts: None,
+                    stmts: None,
                 };
             } else {
                 return Ok(node);
@@ -442,12 +519,12 @@ impl Parser {
                     rhs: None,
                     val: Some(0),
                     lvar: None,
-										stmts: None,
+                    stmts: None,
                 })),
                 rhs: Some(Box::new(self.primary()?)),
                 val: None,
                 lvar: None,
-								stmts: None,
+                stmts: None,
             });
         } else {
             return self.primary();
@@ -462,38 +539,38 @@ impl Parser {
         } else if self.tokens[self.pos].kind == TokenKind::Ident {
             let lvar = self.find_or_create_lvar(&self.tokens[self.pos].str.clone());
             self.pos += 1;
-						if self.consume("(") {
-							let mut args = Vec::new();
-							if self.consume(")") {
-								Ok(Node {
-									kind: NodeKind::Fncall,
-									lhs: None,
-									rhs: None,
-									val: None,
-									lvar: Some(lvar),
-									stmts: Some(args),
-								})
-							} else {
-								args = self.arglist()?;
-								Ok(Node {
-									kind: NodeKind::Fncall,
-									lhs: None,
-									rhs: None,
-									val: None,
-									lvar: Some(lvar),
-									stmts: Some(args),
-								})
-							}
-						} else {
-							Ok(Node {
-									kind: NodeKind::Lvar,
-									lhs: None,
-									rhs: None,
-									val: None,
-									lvar: Some(lvar),
-									stmts: None,
-							})
-						}
+            if self.consume("(") {
+                let mut args = Vec::new();
+                if self.consume(")") {
+                    Ok(Node {
+                        kind: NodeKind::Fncall,
+                        lhs: None,
+                        rhs: None,
+                        val: None,
+                        lvar: Some(lvar),
+                        stmts: Some(args),
+                    })
+                } else {
+                    args = self.arglist()?;
+                    Ok(Node {
+                        kind: NodeKind::Fncall,
+                        lhs: None,
+                        rhs: None,
+                        val: None,
+                        lvar: Some(lvar),
+                        stmts: Some(args),
+                    })
+                }
+            } else {
+                Ok(Node {
+                    kind: NodeKind::Lvar,
+                    lhs: None,
+                    rhs: None,
+                    val: None,
+                    lvar: Some(lvar),
+                    stmts: None,
+                })
+            }
         } else {
             Ok(Node {
                 kind: NodeKind::Num,
@@ -501,24 +578,24 @@ impl Parser {
                 rhs: None,
                 val: Some(self.expect_number()?),
                 lvar: None,
-								stmts: None,
+                stmts: None,
             })
         }
     }
 
-		fn arglist(&mut self) -> Result<Vec<Node>, String> {
-			let mut args = Vec::new();
-			args.push(self.expr()?);
+    fn arglist(&mut self) -> Result<Vec<Node>, String> {
+        let mut args = Vec::new();
+        args.push(self.expr()?);
 
-			loop {
-				if self.consume(",") {
-					args.push(self.expr()?);
-				} else {
-					break;
-				}
-			}
-			
-			self.expect(")")?;
-			Ok(args)
-		}
+        loop {
+            if self.consume(",") {
+                args.push(self.expr()?);
+            } else {
+                break;
+            }
+        }
+
+        self.expect(")")?;
+        Ok(args)
+    }
 }
