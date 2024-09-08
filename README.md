@@ -3,7 +3,9 @@
 ## Production rule
 生成規則:
 ```
-program    ::= stmt*
+program    ::= function*
+function   ::= ident "(" paramlist? ")" "{" stmt* "}"
+paramlist  ::= ident ("," ident)*
 stmt       ::= expr ";"
              | "{" stmt* "}"
              | "if" "(" expr ")" stmt ("else" stmt)?
