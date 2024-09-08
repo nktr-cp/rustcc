@@ -88,6 +88,15 @@ pub fn gen(node: &Node, id: &mut i32) {
 				println!("  jmp .Lbegin{}", local_id);
 				println!(".Lend{}:", local_id);
 			}
+			NodeKind::Block => {
+				let stmts = node.stmts.as_ref().unwrap();
+				for (i, stmt) in stmts.iter().enumerate() {
+					gen(stmt, id);
+					if i != stmts.len() - 1 {
+						println!("  pop rax");
+					}
+				}
+			}
 			_ => {
 				gen(node.lhs.as_ref().unwrap(), id);
 				gen(node.rhs.as_ref().unwrap(), id);

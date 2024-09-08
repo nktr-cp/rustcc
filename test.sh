@@ -79,4 +79,27 @@ assert 41 "a=0; while(a<40) a=a+1; if(a==40) a=a+1; return a;"
 
 assert 42 "a=0; while(a<100) if(a==42) return a; else a=a+1; return 255;"
 
+assert 42 "
+a=0;
+while(a<100) {
+	if (a==42) {
+		return a;
+	}
+	a=a+1;
+}
+return 255;"
+
+assert 42 "
+a=0;
+for (i=0; i<42; i=i+1) {
+	if (i==10) {
+		a = a+2;
+		i = i+1;
+	} else {
+		a = a+1;
+	}
+}
+return a;
+"
+
 echo OK
