@@ -4,8 +4,8 @@
 生成規則:
 ```
 program    ::= function*
-function   ::= ident "(" paramlist? ")" "{" stmt* "}"
-paramlist  ::= ident ("," ident)*
+function   ::= type ident "(" paramlist? ")" "{" stmt* "}"
+paramlist  ::= type ident ("," type ident)*
 stmt       ::= expr ";"
              | "{" stmt* "}"
              | "if" "(" expr ")" stmt ("else" stmt)?
@@ -26,6 +26,7 @@ primary    ::= num
              | ident ("(" arglist? ")")?
              | "(" expr ")"
 arglist    ::= expr ("," expr)*
+type       ::= "int"
 ```
 
 ## Acknowledgments
