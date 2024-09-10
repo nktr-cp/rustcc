@@ -111,7 +111,7 @@ pub fn gen(node: &Node, id: &mut i32) {
             println!(".Lend{}:", local_id);
         }
         NodeKind::Block => {
-            let stmts = node.stmts.as_ref().unwrap();
+            let stmts = node.params.as_ref().unwrap();
             for (i, stmt) in stmts.iter().enumerate() {
                 gen(stmt, id);
                 if i != stmts.len() - 1 {
@@ -122,18 +122,51 @@ pub fn gen(node: &Node, id: &mut i32) {
         NodeKind::Fncall => {
             const REGS: [&str; 6] = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
 
-            let args = node.stmts.as_ref().unwrap();
+            let args = node.params.as_ref().unwrap();
             for (i, arg) in args.iter().enumerate() {
                 gen(arg, id);
-                println!("  pop {}", REGS[i]);
+                println!("  pop {} # set {}-th argument", REGS[i], i);
             }
             println!("  mov rax, {}", args.len());
 
             // rspの位置を調整
-            println!("  and rsp, -16");
+            // r10に調整分を保存
+            println!("  mov r10, rsp");
+            println!("  and r10, 15 # save offset to r10");
+            println!("  sub rsp, r10 # align rsp to be divisible by 16");
             println!("  call {}", node.lvar.clone().unwrap().name);
+            println!("  add rsp, r10 # adjust stack pointer after call");
 
-            println!("  push rax");
+            println!("  push rax # rax has return value after call");
+        }
+        NodeKind::Fndef => {
+            const REGS: [&str; 6] = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
+
+            println!(".global {}", node.lvar.clone().unwrap().name);
+            println!("{}:", node.lvar.clone().unwrap().name);
+
+            let args = node.params.as_ref().unwrap();
+
+            // prologue
+            println!("  push rbp");
+            println!("  mov rbp, rsp");
+
+            for (i, _arg) in args.iter().enumerate() {
+                let offset = 8 + 8 * i;
+                println!("  mov rax, rbp");
+                println!("  mov [rax-{}], {}", offset, REGS[i]);
+            }
+
+            println!("  mov rsp, rbp");
+            println!("  sub rsp, {}", 8 + 8 * args.len());
+
+            gen(node.rhs.as_ref().unwrap(), id);
+            println!("  pop rax");
+
+            // epilogue
+            println!("  mov rsp, rbp");
+            println!("  pop rbp");
+            println!("  ret");
         }
         _ => {
             gen(node.lhs.as_ref().unwrap(), id);
