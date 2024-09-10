@@ -73,6 +73,7 @@ pub fn gen(node: &Node, id: &mut i32) {
             gen(node.rhs.as_ref().unwrap(), id); // body
             println!("  jmp .Lbegin{}", local_id);
             println!(".Lend{}:", local_id);
+            return;
         }
         NodeKind::For => {
             let local_id = *id;
@@ -109,6 +110,7 @@ pub fn gen(node: &Node, id: &mut i32) {
             ); // inc
             println!("  jmp .Lbegin{}", local_id);
             println!(".Lend{}:", local_id);
+            return;
         }
         NodeKind::Block => {
             let stmts = node.params.as_ref().unwrap();
@@ -118,6 +120,7 @@ pub fn gen(node: &Node, id: &mut i32) {
                     println!("  pop rax");
                 }
             }
+            return;
         }
         NodeKind::Fncall => {
             const REGS: [&str; 6] = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
@@ -125,7 +128,7 @@ pub fn gen(node: &Node, id: &mut i32) {
             let args = node.params.as_ref().unwrap();
             for (i, arg) in args.iter().enumerate() {
                 gen(arg, id);
-                println!("  pop {} # set {}-th argument", REGS[i], i);
+                println!("  pop {}", REGS[i]);
             }
             println!("  mov rax, {}", args.len());
 
@@ -138,6 +141,7 @@ pub fn gen(node: &Node, id: &mut i32) {
             println!("  add rsp, r10 # adjust stack pointer after call");
 
             println!("  push rax # rax has return value after call");
+            return;
         }
         NodeKind::Fndef => {
             const REGS: [&str; 6] = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
@@ -146,27 +150,42 @@ pub fn gen(node: &Node, id: &mut i32) {
             println!("{}:", node.lvar.clone().unwrap().name);
 
             let args = node.params.as_ref().unwrap();
+						let locals = node.locals.as_ref().unwrap();
 
             // prologue
             println!("  push rbp");
-            println!("  mov rbp, rsp");
+            println!("  mov rbp, rsp # save base pointer");
+            println!(
+                "  sub rsp, {} # make spaces for local variables",
+                locals.len() * 8 + args.len() * 8 + 8
+            );
 
+						// save arguments to local variables
             for (i, _arg) in args.iter().enumerate() {
-                let offset = 8 + 8 * i;
+                let offset = 8 * i + 8;
                 println!("  mov rax, rbp");
-                println!("  mov [rax-{}], {}", offset, REGS[i]);
+                println!("  mov [rax-{}], {} # push argument", offset, REGS[i]);
             }
-
-            println!("  mov rsp, rbp");
-            println!("  sub rsp, {}", 8 + 8 * args.len());
 
             gen(node.rhs.as_ref().unwrap(), id);
             println!("  pop rax");
 
             // epilogue
-            println!("  mov rsp, rbp");
-            println!("  pop rbp");
+            println!("  mov rsp, rbp # restore stack pointer");
+            println!("  pop rbp # discard base pointer");
             println!("  ret");
+            return;
+        }
+        NodeKind::Ref => {
+            gen_lval(node.lhs.as_ref().unwrap());
+            return;
+        }
+        NodeKind::Deref => {
+            gen(node.lhs.as_ref().unwrap(), id);
+            println!("  pop rax");
+            println!("  mov rax, [rax]");
+            println!("  push rax");
+            return;
         }
         _ => {
             gen(node.lhs.as_ref().unwrap(), id);

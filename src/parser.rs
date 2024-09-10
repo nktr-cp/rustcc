@@ -24,6 +24,8 @@ pub enum NodeKind {
     Block,
     Fncall,
     Fndef,
+    Ref,
+    Deref,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -40,12 +42,14 @@ pub struct Node {
     pub val: Option<i32>,
     pub lvar: Option<LVar>,
     pub params: Option<Vec<Node>>,
+    pub locals: Option<Vec<LVar>>, // 関数単位でのローカル変数
 }
 
 pub struct Parser {
     tokens: Vec<Token>,
     pos: usize,
-    pub locals: HashMap<String, LVar>,
+    fn_idx: usize,
+    pub locals: Vec<HashMap<String, LVar>>, // function name -> local variables
     pub functions: Vec<String>,
 }
 
@@ -54,20 +58,21 @@ impl Parser {
         Parser {
             tokens,
             pos: 0,
-            locals: HashMap::new(),
+            fn_idx: 0, // indicates the index of the current function
+            locals: Vec::new(),
             functions: Vec::new(),
         }
     }
 
     fn find_or_create_lvar(&mut self, name: &str) -> LVar {
-        if let Some(lvar) = self.locals.get(name) {
+        if let Some(lvar) = self.locals[self.fn_idx].get(name) {
             return lvar.clone();
         }
         let lvar = LVar {
             name: name.to_string(),
-            offset: (self.locals.len() + 1) * 8,
+            offset: self.locals[self.fn_idx].len() * 8 + 8,
         };
-        self.locals.insert(name.to_string(), lvar.clone());
+        self.locals[self.fn_idx].insert(name.to_string(), lvar.clone());
         lvar
     }
 
@@ -108,7 +113,9 @@ impl Parser {
     pub fn program(&mut self) -> Result<Vec<Node>, String> {
         let mut nodes = Vec::new();
         while !self.at_eof() {
+						self.locals.push(HashMap::new());
             nodes.push(self.function()?);
+            self.fn_idx += 1;
         }
         return Ok(nodes);
     }
@@ -142,6 +149,7 @@ impl Parser {
                 offset: 0,
             }),
             params: Some(params),
+            locals: Some(self.locals[self.fn_idx].values().cloned().collect()),
         })
     }
 
@@ -157,6 +165,7 @@ impl Parser {
                 val: None,
                 lvar: Some(lvar),
                 params: None,
+                locals: None,
             });
             self.pos += 1;
             if !self.consume(",") {
@@ -183,6 +192,7 @@ impl Parser {
                 val: None,
                 lvar: None,
                 params: Some(stmts),
+                locals: None,
             }
         } else if self.consume("return") {
             node = Node {
@@ -192,6 +202,7 @@ impl Parser {
                 val: None,
                 lvar: None,
                 params: None,
+                locals: None,
             };
             self.expect(";")?;
         } else if self.consume("for") {
@@ -202,6 +213,7 @@ impl Parser {
                 val: Some(0),
                 lvar: None,
                 params: None,
+                locals: None,
             };
             let mut cond = Node {
                 kind: NodeKind::Num,
@@ -210,6 +222,7 @@ impl Parser {
                 val: Some(1), // default condition is true
                 lvar: None,
                 params: None,
+                locals: None,
             };
             let mut inc = Node {
                 kind: NodeKind::Num,
@@ -218,6 +231,7 @@ impl Parser {
                 val: Some(0),
                 lvar: None,
                 params: None,
+                locals: None,
             };
             self.expect("(")?;
             if !self.consume(";") {
@@ -245,14 +259,17 @@ impl Parser {
                         val: None,
                         lvar: None,
                         params: None,
+                        locals: None,
                     })),
                     val: None,
                     lvar: None,
                     params: None,
+                    locals: None,
                 })),
                 val: None,
                 lvar: None,
                 params: None,
+                locals: None,
             };
         } else if self.consume("while") {
             self.expect("(")?;
@@ -265,6 +282,7 @@ impl Parser {
                 val: None,
                 lvar: None,
                 params: None,
+                locals: None,
             };
         } else if self.consume("if") {
             self.expect("(")?;
@@ -283,10 +301,13 @@ impl Parser {
                         val: None,
                         lvar: None,
                         params: None,
+
+                        locals: None,
                     })),
                     val: None,
                     lvar: None,
                     params: None,
+                    locals: None,
                 };
             } else {
                 node = Node {
@@ -296,6 +317,7 @@ impl Parser {
                     val: None,
                     lvar: None,
                     params: None,
+                    locals: None,
                 };
             }
         } else {
@@ -320,6 +342,7 @@ impl Parser {
                 val: None,
                 lvar: None,
                 params: None,
+                locals: None,
             };
         }
 
@@ -338,6 +361,7 @@ impl Parser {
                     val: None,
                     lvar: None,
                     params: None,
+                    locals: None,
                 };
             } else if self.consume("!=") {
                 node = Node {
@@ -347,6 +371,7 @@ impl Parser {
                     val: None,
                     lvar: None,
                     params: None,
+                    locals: None,
                 };
             } else {
                 return Ok(node);
@@ -366,6 +391,7 @@ impl Parser {
                     val: None,
                     lvar: None,
                     params: None,
+                    locals: None,
                 };
             } else if self.consume("<=") {
                 node = Node {
@@ -375,6 +401,7 @@ impl Parser {
                     val: None,
                     lvar: None,
                     params: None,
+                    locals: None,
                 };
             } else if self.consume(">") {
                 node = Node {
@@ -384,6 +411,7 @@ impl Parser {
                     val: None,
                     lvar: None,
                     params: None,
+                    locals: None,
                 };
             } else if self.consume(">=") {
                 node = Node {
@@ -393,6 +421,7 @@ impl Parser {
                     val: None,
                     lvar: None,
                     params: None,
+                    locals: None,
                 };
             } else {
                 return Ok(node);
@@ -412,6 +441,7 @@ impl Parser {
                     val: None,
                     lvar: None,
                     params: None,
+                    locals: None,
                 };
             } else if self.consume("-") {
                 node = Node {
@@ -421,6 +451,7 @@ impl Parser {
                     val: None,
                     lvar: None,
                     params: None,
+                    locals: None,
                 };
             } else {
                 return Ok(node);
@@ -440,6 +471,7 @@ impl Parser {
                     val: None,
                     lvar: None,
                     params: None,
+                    locals: None,
                 };
             } else if self.consume("/") {
                 node = Node {
@@ -449,6 +481,7 @@ impl Parser {
                     val: None,
                     lvar: None,
                     params: None,
+                    locals: None,
                 };
             } else {
                 return Ok(node);
@@ -470,11 +503,33 @@ impl Parser {
                     val: Some(0),
                     lvar: None,
                     params: None,
+                    locals: None,
                 })),
                 rhs: Some(Box::new(self.primary()?)),
                 val: None,
                 lvar: None,
                 params: None,
+                locals: None,
+            });
+        } else if self.consume("&") {
+            return Ok(Node {
+                kind: NodeKind::Ref,
+                lhs: Some(Box::new(self.unary()?)),
+                rhs: None,
+                val: None,
+                lvar: None,
+                params: None,
+                locals: None,
+            });
+        } else if self.consume("*") {
+            return Ok(Node {
+                kind: NodeKind::Deref,
+                lhs: Some(Box::new(self.unary()?)),
+                rhs: None,
+                val: None,
+                lvar: None,
+                params: None,
+                locals: None,
             });
         } else {
             return self.primary();
@@ -499,6 +554,7 @@ impl Parser {
                         val: None,
                         lvar: Some(lvar),
                         params: Some(args),
+                        locals: None,
                     })
                 } else {
                     args = self.arglist()?;
@@ -509,6 +565,7 @@ impl Parser {
                         val: None,
                         lvar: Some(lvar),
                         params: Some(args),
+                        locals: None,
                     })
                 }
             } else {
@@ -519,6 +576,7 @@ impl Parser {
                     val: None,
                     lvar: Some(lvar),
                     params: None,
+                    locals: None,
                 })
             }
         } else {
@@ -529,6 +587,7 @@ impl Parser {
                 val: Some(self.expect_number()?),
                 lvar: None,
                 params: None,
+                locals: None,
             })
         }
     }

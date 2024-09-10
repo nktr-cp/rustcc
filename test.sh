@@ -52,7 +52,62 @@ fib(n) {
 main() {
 	return fib(10);
 }
+"
 
+assert 55 "
+sumup2(m, n) {
+	ret = 0;
+	for (i = m; i <= n; i = i + 1) {
+		ret = ret + i;
+	}
+	return ret;
+}
+
+main() {
+	return sumup2(1, 10);
+}
+"
+
+assert 42 "
+main() {
+x = 21;
+y = 42;
+return y;
+}
+"
+
+assert 42 "
+main() {
+	x = 42;
+	return *(&x);
+}
+"
+
+assert 42 "
+main() {
+	x = 42;
+	ptr = &x;
+	return *ptr;
+}
+"
+
+assert 42 "
+main() {
+	x = 42;
+	y = &x;
+	z = &y;
+	return **z;
+}
+"
+
+assert 42 "
+main() {
+	x = 21;
+	y = 42;
+
+	ptr = &x - 8;
+	return *ptr;
+}
 "
 
 # fib() {
