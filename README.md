@@ -12,6 +12,8 @@ stmt       ::= expr ";"
              | "while" "(" expr ")" stmt
              | "for" "(" expt? ";" expr? ";" expr? ")" stmt
              | "return" expr ";"
+             | decl ";"
+decl       ::= type ident ("=" expr)?
 expr       ::= assign
 assign     ::= equlatity ("=" assign)?
 equality   ::= relational ("==" relational | "!=" relational)*
