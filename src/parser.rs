@@ -121,6 +121,7 @@ impl Parser {
     }
 
     fn function(&mut self) -> Result<Node, String> {
+				self.expect("int")?;
         let name = self.tokens[self.pos].str.clone();
         self.pos += 1;
         self.expect("(")?;
@@ -157,6 +158,7 @@ impl Parser {
         let mut params = Vec::new();
 
         loop {
+				self.expect("int")?;
             let lvar = self.find_or_create_lvar(&self.tokens[self.pos].str.clone());
             params.push(Node {
                 kind: NodeKind::Lvar,
@@ -320,12 +322,51 @@ impl Parser {
                     locals: None,
                 };
             }
-        } else {
+        } else if self.consume("int") {
+					node = self.decl()?;
+					self.expect(";")?;
+				} else {
             node = self.expr()?;
             self.expect(";")?;
         }
         Ok(node)
     }
+
+		fn decl(&mut self) -> Result<Node, String> {
+			let node;
+			let lvar = self.find_or_create_lvar(&self.tokens[self.pos].str.clone());
+			self.pos += 1;
+			if self.consume("=") {
+				node = Node {
+					kind: NodeKind::Assign,
+					lhs: Some(Box::new(Node {
+						kind: NodeKind::Lvar,
+						lhs: None,
+						rhs: None,
+						val: None,
+						lvar: Some(lvar.clone()),
+						params: None,
+						locals: None,
+					})),
+					rhs: Some(Box::new(self.expr()?)),
+					val: None,
+					lvar: None,
+					params: None,
+					locals: None,
+				};
+			} else {
+				node = Node {
+					kind: NodeKind::Lvar,
+					lhs: None,
+					rhs: None,
+					val: None,
+					lvar: Some(lvar.clone()),
+					params: None,
+					locals: None,
+				};
+			}
+			Ok(node)
+		}
 
     fn expr(&mut self) -> Result<Node, String> {
         return self.assign();

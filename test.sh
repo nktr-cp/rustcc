@@ -17,95 +17,98 @@ assert() {
   fi
 }
 
-assert 42 "f() {return 10;} main() {return 42;}"
+assert 42 "int f() {return 10;} int main() {return 42;}"
 
 assert 55 "
-echo(n) {
+int echo(int n) {
 	return n;
 }
 
-main() {
+int main() {
 	return echo(55);
 }"
 
 assert 55 "
-sumup(n) {
+int sumup(int n) {
 	if (n <= 1) {
 		return n;
 	}
 	return n + sumup(n-1);
 }
 
-main() {
+int main() {
 	return sumup(10);
 }
 "
 
 assert 55 "
-fib(n) {
+int fib(int n) {
 	if (n <= 1) {
 		return n;
 	}
 	return fib(n-1) + fib(n-2);
 }
 
-main() {
+int main() {
 	return fib(10);
 }
 "
 
+# forのinit部分はexprで処理しているので、代入は現状無理
 assert 55 "
-sumup2(m, n) {
-	ret = 0;
-	for (i = m; i <= n; i = i + 1) {
+int sumup2(int m, int n) {
+	int ret = 0;
+	int i = 0;
+	for (; i <= n; i = i + 1) {
 		ret = ret + i;
 	}
 	return ret;
 }
 
-main() {
+int main() {
 	return sumup2(1, 10);
 }
 "
 
 assert 42 "
-main() {
-x = 21;
-y = 42;
-return y;
+int main() {
+	int x = 21;
+	int y = 42;
+	return y;
 }
 "
 
 assert 42 "
-main() {
-	x = 42;
+int main() {
+	int x = 42;
 	return *(&x);
 }
 "
 
 assert 42 "
-main() {
-	x = 42;
-	ptr = &x;
+int main() {
+	int x = 42;
+	int ptr = &x;
 	return *ptr;
 }
 "
 
 assert 42 "
-main() {
-	x = 42;
-	y = &x;
-	z = &y;
+int main() {
+	int x = 42;
+	int y = &x;
+	int z = &y;
 	return **z;
 }
 "
 
-assert 42 "
-main() {
-	x = 21;
-	y = 42;
+assert 55 "
+int main() {
+	int x = 21;
+	int y = 42;
 
-	ptr = &x - 8;
+	int ptr = &x - 8;
+	y = 55;
 	return *ptr;
 }
 "
