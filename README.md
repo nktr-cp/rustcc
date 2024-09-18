@@ -22,13 +22,14 @@ add        ::= mul ("+" mul | "-" mul)*
 mul        ::= unary ("*" unary | "/" unary)*
 unary      ::= "+"? primary
              | "-"? primary
-             | "*"? unary
-             | "&"? unary
+             | "*" unary
+             | "&" unary
 primary    ::= num
              | ident ("(" arglist? ")")?
              | "(" expr ")"
-arglist    ::= expr ("," expr)*
-type       ::= "int"
+arglist    ::= type ("," expr)*
+type       ::= base_type "*"*
+base_type  ::= "int"
 ```
 
 ## Acknowledgments
