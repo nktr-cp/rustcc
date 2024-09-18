@@ -1,13 +1,20 @@
 use crate::error;
 use crate::parser::{BinaryOpKind, ComparisonOpKind, Node, NodeKind, UnaryOpKind};
 
-fn gen_lval(node: &Node) {
+fn gen_lval(node: &Node, id: &mut i32) {
     match &node.kind {
         NodeKind::LVar(lvar) => {
             println!("  mov rax, rbp");
             println!("  sub rax, {}", lvar.offset);
             println!("  push rax");
         }
+				// デリファレンスの場合は右辺値を生成
+				// genを呼んでアドレスをraxに詰める
+				NodeKind::UnaryOp(op) => {
+					if *op == UnaryOpKind::Deref {
+						gen(node.lhs.as_ref().unwrap(), id);
+					}
+				}
         _ => {
             error::error("代入の左辺値が変数ではありません");
         }
@@ -21,14 +28,14 @@ pub fn gen(node: &Node, id: &mut i32) {
             return;
         }
         NodeKind::LVar(_lvar) => {
-            gen_lval(node);
+            gen_lval(node, id);
             println!("  pop rax");
             println!("  mov rax, [rax]");
             println!("  push rax");
             return;
         }
         NodeKind::Assign => {
-            gen_lval(node.lhs.as_ref().unwrap());
+            gen_lval(node.lhs.as_ref().unwrap(), id);
             gen(node.rhs.as_ref().unwrap(), id);
 
             println!("  pop rdi");
@@ -140,11 +147,11 @@ pub fn gen(node: &Node, id: &mut i32) {
 
             println!("  push rax # rax has return value after call");
         }
-        NodeKind::Fndef(name, args, locals) => {
+        NodeKind::Fndef(lvar, args, locals) => {
             const REGS: [&str; 6] = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
 
-            println!(".global {}", name);
-            println!("{}:", name);
+            println!(".global {}", lvar.name);
+            println!("{}:", lvar.name);
 
             // prologue
             println!("  push rbp");
@@ -172,7 +179,7 @@ pub fn gen(node: &Node, id: &mut i32) {
         }
         NodeKind::UnaryOp(op) => match op {
             UnaryOpKind::Ref => {
-                gen_lval(node.lhs.as_ref().unwrap());
+                gen_lval(node.lhs.as_ref().unwrap(), id);
                 return;
             }
             UnaryOpKind::Deref => {

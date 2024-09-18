@@ -190,6 +190,7 @@ int main() {
 assert 42 "
 int main() {
 	int a=0;
+	int i=0;
 	for (i=0; i<42; i=i+1) {
 		if (i==10) {
 			a = a+2;
@@ -199,6 +200,26 @@ int main() {
 		}
 	}
 	return a;
+}
+"
+
+assert 42 "
+int main() {
+	int x=12;
+	int* y = &x;
+	*y = 42;
+	return x;
+}
+"
+
+assert 42 "
+int main() {
+	int x=12;
+	int* y = &x;
+	int** z = &y;
+	int*** w = &z;
+	***w = 42;
+	return x;
 }
 "
 

@@ -26,27 +26,46 @@ pub enum ComparisonOpKind {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum TypeKind {
+    Int,
+    Ptr,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Type {
+    pub kind: TypeKind,
+    pub ptr_to: Option<Box<Type>>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct LVar {
     pub name: String,
     pub offset: usize,
+    pub ty: Type,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Function {
+    pub name: String,
+    pub ty: Type,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum NodeKind {
-    BinaryOp(BinaryOpKind),              // Binaty operations: +, -, *, /
-    UnaryOp(UnaryOpKind),                // Unary operations: &, *
-    Num(i32),                            // Numeric literals
-    LVar(LVar),                          // Local variable
-    Assign,                              // Assignment
-    Return,                              // Return statement
-    Block(Vec<Node>),                    // Block of statements
-    Fncall(LVar, Vec<Node>),             // Function call
-    Fndef(String, Vec<Node>, Vec<LVar>), // Function definition
-    For,
-    While,
-    If,
-    Else,
-    Comparison(ComparisonOpKind),
+    BinaryOp(BinaryOpKind),                // Binaty operations: +, -, *, /
+    UnaryOp(UnaryOpKind),                  // Unary operations: &, *
+    Comparison(ComparisonOpKind),          // Comparison operations: ==, !=, <, <=, >, >=
+    Num(i32),                              // Numeric literals
+    LVar(LVar),                            // Local variable
+    Assign,                                // Assignment
+    Return,                                // Return statement
+    Block(Vec<Node>),                      // Block of statements
+    Fncall(Function, Vec<Node>),           // Function call with arguments
+    Fndef(Function, Vec<Node>, Vec<LVar>), // Function definition (name, parameters, local variables)
+    For,                                   // For
+    While,                                 // While
+    If,                                    // If
+    Else,                                  // Else
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -61,7 +80,7 @@ pub struct Parser {
     pos: usize,
     fn_idx: usize,
     pub locals: Vec<HashMap<String, LVar>>, // function name -> local variables
-    pub functions: Vec<String>,
+    pub functions: Vec<Function>,
 }
 
 impl Parser {
@@ -75,16 +94,21 @@ impl Parser {
         }
     }
 
-    fn find_or_create_lvar(&mut self, name: &str) -> LVar {
+    fn create_lvar(&mut self, name: &str, ty: Type) -> LVar {
         if let Some(lvar) = self.locals[self.fn_idx].get(name) {
             return lvar.clone();
         }
         let lvar = LVar {
             name: name.to_string(),
             offset: self.locals[self.fn_idx].len() * 8 + 8,
+            ty: ty.clone(),
         };
         self.locals[self.fn_idx].insert(name.to_string(), lvar.clone());
         lvar
+    }
+
+    fn find_lvar(&self, name: &str) -> Option<&LVar> {
+        self.locals[self.fn_idx].get(name)
     }
 
     fn consume(&mut self, op: &str) -> bool {
@@ -132,7 +156,7 @@ impl Parser {
     }
 
     fn function(&mut self) -> Result<Node, String> {
-        self.expect("int")?;
+        let ty = self.ty()?;
         let name = self.tokens[self.pos].str.clone();
         self.pos += 1;
         self.expect("(")?;
@@ -143,17 +167,22 @@ impl Parser {
             self.expect(")")?;
         }
 
-        if self.functions.contains(&name) {
+        let func = Function {
+            name: name.clone(),
+            ty: ty.clone(),
+        };
+
+        if self.functions.contains(&func) {
             return Err(format!("関数{}は既に定義されています", name));
         } else {
-            self.functions.push(name.clone());
+            self.functions.push(func.clone());
         }
 
         let body = self.stmt()?;
 
         Ok(Node {
             kind: NodeKind::Fndef(
-                name,
+                func,
                 params,
                 self.locals[self.fn_idx].values().cloned().collect(),
             ),
@@ -166,8 +195,8 @@ impl Parser {
         let mut params = Vec::new();
 
         loop {
-            self.expect("int")?;
-            let lvar = self.find_or_create_lvar(&self.tokens[self.pos].str.clone());
+            let ty = self.ty()?;
+            let lvar = self.create_lvar(&self.tokens[self.pos].str.clone(), ty.clone());
             params.push(Node {
                 kind: NodeKind::LVar(lvar),
                 lhs: None,
@@ -277,19 +306,20 @@ impl Parser {
                     rhs: Some(Box::new(then)),
                 };
             }
-        } else if self.consume("int") {
+        } else if self.tokens[self.pos].str == "int" {
             node = self.decl()?;
             self.expect(";")?;
         } else {
-            node = self.expr()?;
-            self.expect(";")?;
-        }
+					node = self.expr()?;
+					self.expect(";")?;
+				}
         Ok(node)
     }
 
     fn decl(&mut self) -> Result<Node, String> {
         let node;
-        let lvar = self.find_or_create_lvar(&self.tokens[self.pos].str.clone());
+        let ty = self.ty()?;
+        let lvar = self.create_lvar(&self.tokens[self.pos].str.clone(), ty);
         self.pos += 1;
         if self.consume("=") {
             node = Node {
@@ -466,30 +496,54 @@ impl Parser {
             self.expect(")")?;
             Ok(node)
         } else if self.tokens[self.pos].kind == TokenKind::Ident {
-            let lvar = self.find_or_create_lvar(&self.tokens[self.pos].str.clone());
+            let name = self.tokens[self.pos].str.clone();
+            let lvar = self.find_lvar(&name).cloned();
+            // func を先に取得し、所有権を確保
+            // let func = self.functions.iter().find(|f| f.name == name).cloned();
+						let func = Function {
+								name: name.clone(),
+								// 一旦戻り値の型は適当にする
+								// sizeofとか実装したらちゃんとやる
+								ty: Type {
+										kind: TypeKind::Int,
+										ptr_to: None,
+								},
+						};
             self.pos += 1;
+
             if self.consume("(") {
+								// ここはいらなかった、
+								// 関数の索引をやるのはリンカの仕事
+                // if func.is_none() {
+                //     return Err(format!("関数 '{}' が見つかりません", name));
+                // }
+
                 let mut args = Vec::new();
                 if self.consume(")") {
                     Ok(Node {
-                        kind: NodeKind::Fncall(lvar, args),
+                        kind: NodeKind::Fncall(func, args),
                         lhs: None,
                         rhs: None,
                     })
                 } else {
                     args = self.arglist()?;
                     Ok(Node {
-                        kind: NodeKind::Fncall(lvar, args),
+                        kind: NodeKind::Fncall(func
+													, args),
                         lhs: None,
                         rhs: None,
                     })
                 }
             } else {
-                Ok(Node {
-                    kind: NodeKind::LVar(lvar),
-                    lhs: None,
-                    rhs: None,
-                })
+                if lvar.is_none() {
+                    return Err(format!("変数 '{}' が見つかりません", name));
+                } else {
+                    Ok(Node {
+                        kind: NodeKind::LVar(lvar.unwrap()),
+                        lhs: None,
+                        rhs: None,
+                    })
+                }
             }
         } else {
             Ok(Node {
@@ -514,5 +568,36 @@ impl Parser {
 
         self.expect(")")?;
         Ok(args)
+    }
+
+    fn ty(&mut self) -> Result<Type, String> {
+        let mut ty = self.base_type()?;
+
+        loop {
+            if self.consume("*") {
+                ty = Type {
+                    kind: TypeKind::Ptr,
+                    ptr_to: Some(Box::new(ty)),
+                };
+            } else {
+                break;
+            }
+        }
+
+        Ok(ty)
+    }
+
+    fn base_type(&mut self) -> Result<Type, String> {
+        if self.consume("int") {
+            Ok(Type {
+                kind: TypeKind::Int,
+                ptr_to: None,
+            })
+        } else {
+            Err(format!(
+                "intが期待されますが、{}でした",
+                self.tokens[self.pos].str
+            ))
+        }
     }
 }
