@@ -1,23 +1,26 @@
 use crate::error;
-use crate::parser::{Node, NodeKind};
+use crate::parser::{BinaryOpKind, ComparisonOpKind, Node, NodeKind, UnaryOpKind};
 
 fn gen_lval(node: &Node) {
-    if node.kind != NodeKind::Lvar {
-        error::error("代入の左辺値が変数ではありません");
+    match &node.kind {
+        NodeKind::LVar(lvar) => {
+            println!("  mov rax, rbp");
+            println!("  sub rax, {}", lvar.offset);
+            println!("  push rax");
+        }
+        _ => {
+            error::error("代入の左辺値が変数ではありません");
+        }
     }
-
-    println!("  mov rax, rbp");
-    println!("  sub rax, {}", node.lvar.clone().unwrap().offset);
-    println!("  push rax");
 }
 
 pub fn gen(node: &Node, id: &mut i32) {
-    match node.kind {
-        NodeKind::Num => {
-            println!("  push {}", node.val.unwrap());
+    match &node.kind {
+        NodeKind::Num(val) => {
+            println!("  push {}", val);
             return;
         }
-        NodeKind::Lvar => {
+        NodeKind::LVar(_lvar) => {
             gen_lval(node);
             println!("  pop rax");
             println!("  mov rax, [rax]");
@@ -73,7 +76,6 @@ pub fn gen(node: &Node, id: &mut i32) {
             gen(node.rhs.as_ref().unwrap(), id); // body
             println!("  jmp .Lbegin{}", local_id);
             println!(".Lend{}:", local_id);
-            return;
         }
         NodeKind::For => {
             let local_id = *id;
@@ -110,25 +112,21 @@ pub fn gen(node: &Node, id: &mut i32) {
             ); // inc
             println!("  jmp .Lbegin{}", local_id);
             println!(".Lend{}:", local_id);
-            return;
         }
-        NodeKind::Block => {
-            let stmts = node.params.as_ref().unwrap();
+        NodeKind::Block(stmts) => {
             for (i, stmt) in stmts.iter().enumerate() {
                 gen(stmt, id);
                 if i != stmts.len() - 1 {
                     println!("  pop rax");
                 }
             }
-            return;
         }
-        NodeKind::Fncall => {
+        NodeKind::Fncall(lvar, args) => {
             const REGS: [&str; 6] = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
 
-            let args = node.params.as_ref().unwrap();
             for (i, arg) in args.iter().enumerate() {
                 gen(arg, id);
-                println!("  pop {}", REGS[i]);
+                println!("  pop {} # set {}-th argument", REGS[i], i);
             }
             println!("  mov rax, {}", args.len());
 
@@ -137,20 +135,16 @@ pub fn gen(node: &Node, id: &mut i32) {
             println!("  mov r10, rsp");
             println!("  and r10, 15 # save offset to r10");
             println!("  sub rsp, r10 # align rsp to be divisible by 16");
-            println!("  call {}", node.lvar.clone().unwrap().name);
+            println!("  call {}", lvar.name);
             println!("  add rsp, r10 # adjust stack pointer after call");
 
             println!("  push rax # rax has return value after call");
-            return;
         }
-        NodeKind::Fndef => {
+        NodeKind::Fndef(name, args, locals) => {
             const REGS: [&str; 6] = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
 
-            println!(".global {}", node.lvar.clone().unwrap().name);
-            println!("{}:", node.lvar.clone().unwrap().name);
-
-            let args = node.params.as_ref().unwrap();
-						let locals = node.locals.as_ref().unwrap();
+            println!(".global {}", name);
+            println!("{}:", name);
 
             // prologue
             println!("  push rbp");
@@ -160,7 +154,7 @@ pub fn gen(node: &Node, id: &mut i32) {
                 locals.len() * 8 + args.len() * 8 + 8
             );
 
-						// save arguments to local variables
+            // save arguments to local variables
             for (i, _arg) in args.iter().enumerate() {
                 let offset = 8 * i + 8;
                 println!("  mov rax, rbp");
@@ -176,17 +170,19 @@ pub fn gen(node: &Node, id: &mut i32) {
             println!("  ret");
             return;
         }
-        NodeKind::Ref => {
-            gen_lval(node.lhs.as_ref().unwrap());
-            return;
-        }
-        NodeKind::Deref => {
-            gen(node.lhs.as_ref().unwrap(), id);
-            println!("  pop rax");
-            println!("  mov rax, [rax]");
-            println!("  push rax");
-            return;
-        }
+        NodeKind::UnaryOp(op) => match op {
+            UnaryOpKind::Ref => {
+                gen_lval(node.lhs.as_ref().unwrap());
+                return;
+            }
+            UnaryOpKind::Deref => {
+                gen(node.lhs.as_ref().unwrap(), id);
+                println!("  pop rax");
+                println!("  mov rax, [rax]");
+                println!("  push rax");
+                return;
+            }
+        },
         _ => {
             gen(node.lhs.as_ref().unwrap(), id);
             gen(node.rhs.as_ref().unwrap(), id);
@@ -194,44 +190,48 @@ pub fn gen(node: &Node, id: &mut i32) {
             println!("  pop rdi");
             println!("  pop rax");
 
-            match node.kind {
-                NodeKind::Add => println!("  add rax, rdi"),
-                NodeKind::Sub => println!("  sub rax, rdi"),
-                NodeKind::Mul => println!("  imul rax, rdi"),
-                NodeKind::Div => {
-                    println!("  cqo");
-                    println!("  idiv rdi");
-                }
-                NodeKind::Eq => {
-                    println!("  cmp rax, rdi");
-                    println!("  sete al");
-                    println!("  movzb rax, al");
-                }
-                NodeKind::Nq => {
-                    println!("  cmp rax, rdi");
-                    println!("  setne al");
-                    println!("  movzb rax, al");
-                }
-                NodeKind::Lt => {
-                    println!("  cmp rax, rdi");
-                    println!("  setl al");
-                    println!("  movzb rax, al");
-                }
-                NodeKind::Le => {
-                    println!("  cmp rax, rdi");
-                    println!("  setle al");
-                    println!("  movzb rax, al");
-                }
-                NodeKind::Gt => {
-                    println!("  cmp rax, rdi");
-                    println!("  setg al");
-                    println!("  movzb rax, al");
-                }
-                NodeKind::Ge => {
-                    println!("  cmp rax, rdi");
-                    println!("  setge al");
-                    println!("  movzb rax, al");
-                }
+            match &node.kind {
+                NodeKind::BinaryOp(op) => match op {
+                    BinaryOpKind::Add => println!("  add rax, rdi"),
+                    BinaryOpKind::Sub => println!("  sub rax, rdi"),
+                    BinaryOpKind::Mul => println!("  imul rax, rdi"),
+                    BinaryOpKind::Div => {
+                        println!("  cqo");
+                        println!("  idiv rdi");
+                    }
+                },
+                NodeKind::Comparison(op) => match op {
+                    ComparisonOpKind::Eq => {
+                        println!("  cmp rax, rdi");
+                        println!("  sete al");
+                        println!("  movzb rax, al");
+                    }
+                    ComparisonOpKind::Nq => {
+                        println!("  cmp rax, rdi");
+                        println!("  setne al");
+                        println!("  movzb rax, al");
+                    }
+                    ComparisonOpKind::Lt => {
+                        println!("  cmp rax, rdi");
+                        println!("  setl al");
+                        println!("  movzb rax, al");
+                    }
+                    ComparisonOpKind::Le => {
+                        println!("  cmp rax, rdi");
+                        println!("  setle al");
+                        println!("  movzb rax, al");
+                    }
+                    ComparisonOpKind::Gt => {
+                        println!("  cmp rax, rdi");
+                        println!("  setg al");
+                        println!("  movzb rax, al");
+                    }
+                    ComparisonOpKind::Ge => {
+                        println!("  cmp rax, rdi");
+                        println!("  setge al");
+                        println!("  movzb rax, al");
+                    }
+                },
                 _ => unreachable!(),
             }
 

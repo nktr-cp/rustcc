@@ -131,14 +131,14 @@ pub fn tokenize(input: &str) -> Vec<Token> {
                     });
                     continue;
                 }
-								"int" => {
-										tokens.push(Token {
-												kind: TokenKind::Reserved,
-												val: None,
-												str: ident,
-										});
-										continue;
-								}
+                "int" => {
+                    tokens.push(Token {
+                        kind: TokenKind::Reserved,
+                        val: None,
+                        str: ident,
+                    });
+                    continue;
+                }
                 _ => {
                     tokens.push(Token {
                         kind: TokenKind::Ident,

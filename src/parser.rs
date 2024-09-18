@@ -2,30 +2,27 @@ use crate::lexer::{Token, TokenKind};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum NodeKind {
+pub enum BinaryOpKind {
     Add,
     Sub,
     Mul,
     Div,
-    Assign,
-    Lvar,
-    Return,
-    For,
-    While,
-    If,
-    Else,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum UnaryOpKind {
+    Ref,
+    Deref,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ComparisonOpKind {
     Eq,
     Nq,
     Lt,
     Le,
     Gt,
     Ge,
-    Num,
-    Block,
-    Fncall,
-    Fndef,
-    Ref,
-    Deref,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -34,15 +31,29 @@ pub struct LVar {
     pub offset: usize,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
+pub enum NodeKind {
+    BinaryOp(BinaryOpKind),              // Binaty operations: +, -, *, /
+    UnaryOp(UnaryOpKind),                // Unary operations: &, *
+    Num(i32),                            // Numeric literals
+    LVar(LVar),                          // Local variable
+    Assign,                              // Assignment
+    Return,                              // Return statement
+    Block(Vec<Node>),                    // Block of statements
+    Fncall(LVar, Vec<Node>),             // Function call
+    Fndef(String, Vec<Node>, Vec<LVar>), // Function definition
+    For,
+    While,
+    If,
+    Else,
+    Comparison(ComparisonOpKind),
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct Node {
     pub kind: NodeKind,
     pub lhs: Option<Box<Node>>,
     pub rhs: Option<Box<Node>>,
-    pub val: Option<i32>,
-    pub lvar: Option<LVar>,
-    pub params: Option<Vec<Node>>,
-    pub locals: Option<Vec<LVar>>, // 関数単位でのローカル変数
 }
 
 pub struct Parser {
@@ -113,7 +124,7 @@ impl Parser {
     pub fn program(&mut self) -> Result<Vec<Node>, String> {
         let mut nodes = Vec::new();
         while !self.at_eof() {
-						self.locals.push(HashMap::new());
+            self.locals.push(HashMap::new());
             nodes.push(self.function()?);
             self.fn_idx += 1;
         }
@@ -121,7 +132,7 @@ impl Parser {
     }
 
     fn function(&mut self) -> Result<Node, String> {
-				self.expect("int")?;
+        self.expect("int")?;
         let name = self.tokens[self.pos].str.clone();
         self.pos += 1;
         self.expect("(")?;
@@ -141,16 +152,13 @@ impl Parser {
         let body = self.stmt()?;
 
         Ok(Node {
-            kind: NodeKind::Fndef,
+            kind: NodeKind::Fndef(
+                name,
+                params,
+                self.locals[self.fn_idx].values().cloned().collect(),
+            ),
             lhs: None,
             rhs: Some(Box::new(body)),
-            val: None,
-            lvar: Some(LVar {
-                name: name.clone(),
-                offset: 0,
-            }),
-            params: Some(params),
-            locals: Some(self.locals[self.fn_idx].values().cloned().collect()),
         })
     }
 
@@ -158,16 +166,12 @@ impl Parser {
         let mut params = Vec::new();
 
         loop {
-				self.expect("int")?;
+            self.expect("int")?;
             let lvar = self.find_or_create_lvar(&self.tokens[self.pos].str.clone());
             params.push(Node {
-                kind: NodeKind::Lvar,
+                kind: NodeKind::LVar(lvar),
                 lhs: None,
                 rhs: None,
-                val: None,
-                lvar: Some(lvar),
-                params: None,
-                locals: None,
             });
             self.pos += 1;
             if !self.consume(",") {
@@ -188,52 +192,32 @@ impl Parser {
                 stmts.push(self.stmt()?);
             }
             node = Node {
-                kind: NodeKind::Block,
+                kind: NodeKind::Block(stmts),
                 lhs: None,
                 rhs: None,
-                val: None,
-                lvar: None,
-                params: Some(stmts),
-                locals: None,
             }
         } else if self.consume("return") {
             node = Node {
                 kind: NodeKind::Return,
                 lhs: Some(Box::new(self.expr()?)),
                 rhs: None,
-                val: None,
-                lvar: None,
-                params: None,
-                locals: None,
             };
             self.expect(";")?;
         } else if self.consume("for") {
             let mut init = Node {
-                kind: NodeKind::Num,
+                kind: NodeKind::Num(0),
                 lhs: None,
                 rhs: None,
-                val: Some(0),
-                lvar: None,
-                params: None,
-                locals: None,
             };
             let mut cond = Node {
-                kind: NodeKind::Num,
+                kind: NodeKind::Num(1), // default should be true
                 lhs: None,
                 rhs: None,
-                val: Some(1), // default condition is true
-                lvar: None,
-                params: None,
-                locals: None,
             };
             let mut inc = Node {
-                kind: NodeKind::Num,
+                kind: NodeKind::Num(0),
                 lhs: None,
                 rhs: None,
-                val: Some(0),
-                lvar: None,
-                params: None,
-                locals: None,
             };
             self.expect("(")?;
             if !self.consume(";") {
@@ -258,20 +242,8 @@ impl Parser {
                         kind: NodeKind::For,
                         lhs: Some(Box::new(inc)),
                         rhs: Some(Box::new(self.stmt()?)),
-                        val: None,
-                        lvar: None,
-                        params: None,
-                        locals: None,
                     })),
-                    val: None,
-                    lvar: None,
-                    params: None,
-                    locals: None,
                 })),
-                val: None,
-                lvar: None,
-                params: None,
-                locals: None,
             };
         } else if self.consume("while") {
             self.expect("(")?;
@@ -281,10 +253,6 @@ impl Parser {
                 kind: NodeKind::While,
                 lhs: Some(Box::new(cond)),
                 rhs: Some(Box::new(self.stmt()?)),
-                val: None,
-                lvar: None,
-                params: None,
-                locals: None,
             };
         } else if self.consume("if") {
             self.expect("(")?;
@@ -300,73 +268,48 @@ impl Parser {
                         kind: NodeKind::Else,
                         lhs: Some(Box::new(then)),
                         rhs: Some(Box::new(els)),
-                        val: None,
-                        lvar: None,
-                        params: None,
-
-                        locals: None,
                     })),
-                    val: None,
-                    lvar: None,
-                    params: None,
-                    locals: None,
                 };
             } else {
                 node = Node {
                     kind: NodeKind::If,
                     lhs: Some(Box::new(cond)),
                     rhs: Some(Box::new(then)),
-                    val: None,
-                    lvar: None,
-                    params: None,
-                    locals: None,
                 };
             }
         } else if self.consume("int") {
-					node = self.decl()?;
-					self.expect(";")?;
-				} else {
+            node = self.decl()?;
+            self.expect(";")?;
+        } else {
             node = self.expr()?;
             self.expect(";")?;
         }
         Ok(node)
     }
 
-		fn decl(&mut self) -> Result<Node, String> {
-			let node;
-			let lvar = self.find_or_create_lvar(&self.tokens[self.pos].str.clone());
-			self.pos += 1;
-			if self.consume("=") {
-				node = Node {
-					kind: NodeKind::Assign,
-					lhs: Some(Box::new(Node {
-						kind: NodeKind::Lvar,
-						lhs: None,
-						rhs: None,
-						val: None,
-						lvar: Some(lvar.clone()),
-						params: None,
-						locals: None,
-					})),
-					rhs: Some(Box::new(self.expr()?)),
-					val: None,
-					lvar: None,
-					params: None,
-					locals: None,
-				};
-			} else {
-				node = Node {
-					kind: NodeKind::Lvar,
-					lhs: None,
-					rhs: None,
-					val: None,
-					lvar: Some(lvar.clone()),
-					params: None,
-					locals: None,
-				};
-			}
-			Ok(node)
-		}
+    fn decl(&mut self) -> Result<Node, String> {
+        let node;
+        let lvar = self.find_or_create_lvar(&self.tokens[self.pos].str.clone());
+        self.pos += 1;
+        if self.consume("=") {
+            node = Node {
+                kind: NodeKind::Assign,
+                lhs: Some(Box::new(Node {
+                    kind: NodeKind::LVar(lvar.clone()),
+                    lhs: None,
+                    rhs: None,
+                })),
+                rhs: Some(Box::new(self.expr()?)),
+            };
+        } else {
+            node = Node {
+                kind: NodeKind::LVar(lvar.clone()),
+                lhs: None,
+                rhs: None,
+            };
+        }
+        Ok(node)
+    }
 
     fn expr(&mut self) -> Result<Node, String> {
         return self.assign();
@@ -380,10 +323,6 @@ impl Parser {
                 kind: NodeKind::Assign,
                 lhs: Some(Box::new(node)),
                 rhs: Some(Box::new(self.assign()?)),
-                val: None,
-                lvar: None,
-                params: None,
-                locals: None,
             };
         }
 
@@ -396,23 +335,15 @@ impl Parser {
         loop {
             if self.consume("==") {
                 node = Node {
-                    kind: NodeKind::Eq,
+                    kind: NodeKind::Comparison(ComparisonOpKind::Eq),
                     lhs: Some(Box::new(node)),
                     rhs: Some(Box::new(self.relational()?)),
-                    val: None,
-                    lvar: None,
-                    params: None,
-                    locals: None,
                 };
             } else if self.consume("!=") {
                 node = Node {
-                    kind: NodeKind::Nq,
+                    kind: NodeKind::Comparison(ComparisonOpKind::Nq),
                     lhs: Some(Box::new(node)),
                     rhs: Some(Box::new(self.relational()?)),
-                    val: None,
-                    lvar: None,
-                    params: None,
-                    locals: None,
                 };
             } else {
                 return Ok(node);
@@ -426,43 +357,27 @@ impl Parser {
         loop {
             if self.consume("<") {
                 node = Node {
-                    kind: NodeKind::Lt,
+                    kind: NodeKind::Comparison(ComparisonOpKind::Lt),
                     lhs: Some(Box::new(node)),
                     rhs: Some(Box::new(self.add()?)),
-                    val: None,
-                    lvar: None,
-                    params: None,
-                    locals: None,
                 };
             } else if self.consume("<=") {
                 node = Node {
-                    kind: NodeKind::Le,
+                    kind: NodeKind::Comparison(ComparisonOpKind::Le),
                     lhs: Some(Box::new(node)),
                     rhs: Some(Box::new(self.add()?)),
-                    val: None,
-                    lvar: None,
-                    params: None,
-                    locals: None,
                 };
             } else if self.consume(">") {
                 node = Node {
-                    kind: NodeKind::Gt,
+                    kind: NodeKind::Comparison(ComparisonOpKind::Gt),
                     lhs: Some(Box::new(node)),
                     rhs: Some(Box::new(self.add()?)),
-                    val: None,
-                    lvar: None,
-                    params: None,
-                    locals: None,
                 };
             } else if self.consume(">=") {
                 node = Node {
-                    kind: NodeKind::Ge,
+                    kind: NodeKind::Comparison(ComparisonOpKind::Ge),
                     lhs: Some(Box::new(node)),
                     rhs: Some(Box::new(self.add()?)),
-                    val: None,
-                    lvar: None,
-                    params: None,
-                    locals: None,
                 };
             } else {
                 return Ok(node);
@@ -476,23 +391,15 @@ impl Parser {
         loop {
             if self.consume("+") {
                 node = Node {
-                    kind: NodeKind::Add,
+                    kind: NodeKind::BinaryOp(BinaryOpKind::Add),
                     lhs: Some(Box::new(node)),
                     rhs: Some(Box::new(self.mul()?)),
-                    val: None,
-                    lvar: None,
-                    params: None,
-                    locals: None,
                 };
             } else if self.consume("-") {
                 node = Node {
-                    kind: NodeKind::Sub,
+                    kind: NodeKind::BinaryOp(BinaryOpKind::Sub),
                     lhs: Some(Box::new(node)),
                     rhs: Some(Box::new(self.mul()?)),
-                    val: None,
-                    lvar: None,
-                    params: None,
-                    locals: None,
                 };
             } else {
                 return Ok(node);
@@ -506,23 +413,15 @@ impl Parser {
         loop {
             if self.consume("*") {
                 node = Node {
-                    kind: NodeKind::Mul,
+                    kind: NodeKind::BinaryOp(BinaryOpKind::Mul),
                     lhs: Some(Box::new(node)),
                     rhs: Some(Box::new(self.unary()?)),
-                    val: None,
-                    lvar: None,
-                    params: None,
-                    locals: None,
                 };
             } else if self.consume("/") {
                 node = Node {
-                    kind: NodeKind::Div,
+                    kind: NodeKind::BinaryOp(BinaryOpKind::Div),
                     lhs: Some(Box::new(node)),
                     rhs: Some(Box::new(self.unary()?)),
-                    val: None,
-                    lvar: None,
-                    params: None,
-                    locals: None,
                 };
             } else {
                 return Ok(node);
@@ -536,41 +435,25 @@ impl Parser {
         } else if self.consume("-") {
             // 0 - x として扱う
             return Ok(Node {
-                kind: NodeKind::Sub,
+                kind: NodeKind::BinaryOp(BinaryOpKind::Sub),
                 lhs: Some(Box::new(Node {
-                    kind: NodeKind::Num,
+                    kind: NodeKind::Num(0),
                     lhs: None,
                     rhs: None,
-                    val: Some(0),
-                    lvar: None,
-                    params: None,
-                    locals: None,
                 })),
                 rhs: Some(Box::new(self.primary()?)),
-                val: None,
-                lvar: None,
-                params: None,
-                locals: None,
             });
         } else if self.consume("&") {
             return Ok(Node {
-                kind: NodeKind::Ref,
+                kind: NodeKind::UnaryOp(UnaryOpKind::Ref),
                 lhs: Some(Box::new(self.unary()?)),
                 rhs: None,
-                val: None,
-                lvar: None,
-                params: None,
-                locals: None,
             });
         } else if self.consume("*") {
             return Ok(Node {
-                kind: NodeKind::Deref,
+                kind: NodeKind::UnaryOp(UnaryOpKind::Deref),
                 lhs: Some(Box::new(self.unary()?)),
                 rhs: None,
-                val: None,
-                lvar: None,
-                params: None,
-                locals: None,
             });
         } else {
             return self.primary();
@@ -589,46 +472,30 @@ impl Parser {
                 let mut args = Vec::new();
                 if self.consume(")") {
                     Ok(Node {
-                        kind: NodeKind::Fncall,
+                        kind: NodeKind::Fncall(lvar, args),
                         lhs: None,
                         rhs: None,
-                        val: None,
-                        lvar: Some(lvar),
-                        params: Some(args),
-                        locals: None,
                     })
                 } else {
                     args = self.arglist()?;
                     Ok(Node {
-                        kind: NodeKind::Fncall,
+                        kind: NodeKind::Fncall(lvar, args),
                         lhs: None,
                         rhs: None,
-                        val: None,
-                        lvar: Some(lvar),
-                        params: Some(args),
-                        locals: None,
                     })
                 }
             } else {
                 Ok(Node {
-                    kind: NodeKind::Lvar,
+                    kind: NodeKind::LVar(lvar),
                     lhs: None,
                     rhs: None,
-                    val: None,
-                    lvar: Some(lvar),
-                    params: None,
-                    locals: None,
                 })
             }
         } else {
             Ok(Node {
-                kind: NodeKind::Num,
+                kind: NodeKind::Num(self.expect_number()?),
                 lhs: None,
                 rhs: None,
-                val: Some(self.expect_number()?),
-                lvar: None,
-                params: None,
-                locals: None,
             })
         }
     }
