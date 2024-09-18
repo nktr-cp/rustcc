@@ -205,7 +205,7 @@ int main() {
 
 assert 42 "
 int main() {
-	int x=12;
+	int x = 12;
 	int* y = &x;
 	*y = 42;
 	return x;
@@ -214,7 +214,7 @@ int main() {
 
 assert 42 "
 int main() {
-	int x=12;
+	int x = 12;
 	int* y = &x;
 	int** z = &y;
 	int*** w = &z;
@@ -295,10 +295,48 @@ no_arg() {
 	fi
 }
 
+alloc4() {
+	expected="$1"
+	input="$2"
+
+	echo "
+	#include <stdlib.h>
+	void alloc4(int** ptr, int a, int b, int c, int d) {
+		*ptr = (int*)malloc(4 * sizeof(int));
+		**ptr = a;
+		*(*ptr + 1) = b;
+		*(*ptr + 2) = c;
+		*(*ptr + 3) = d;
+	}" > alloc4.c
+
+	cargo run -- "$input" > tmp.s
+	cc -c alloc4.c
+	cc -c tmp.s
+	cc tmp.o alloc4.o -o tmp
+	./tmp
+	actual="$?"
+
+	if [ "$actual" = "$expected" ]; then
+		echo "$input => $actual"
+	else
+		echo "$input => $expected expected, but got $actual"
+		exit 1
+	fi
+}
+
 
 no_arg 42 "int main() {return no_arg();}"
 fib 55 "int main() {return fibonacchi(10);}"
 add 42 "int main() {add(20, 22);}"
+alloc4 42 "
+int main() {
+	int *p;
+	alloc4(&p, 0, 0, 0, 42);
+	int *q;
+	q = p + 3;
+	return *q;
+}"
+
 
 rm -f tmp* *.s *.c *.o 
 

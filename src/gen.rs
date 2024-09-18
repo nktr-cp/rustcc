@@ -1,5 +1,5 @@
 use crate::error;
-use crate::parser::{BinaryOpKind, ComparisonOpKind, Node, NodeKind, UnaryOpKind};
+use crate::parser::{BinaryOpKind, ComparisonOpKind, Node, NodeKind, TypeKind, UnaryOpKind};
 
 fn gen_lval(node: &Node, id: &mut i32) {
     match &node.kind {
@@ -8,13 +8,13 @@ fn gen_lval(node: &Node, id: &mut i32) {
             println!("  sub rax, {}", lvar.offset);
             println!("  push rax");
         }
-				// デリファレンスの場合は右辺値を生成
-				// genを呼んでアドレスをraxに詰める
-				NodeKind::UnaryOp(op) => {
-					if *op == UnaryOpKind::Deref {
-						gen(node.lhs.as_ref().unwrap(), id);
-					}
-				}
+        // デリファレンスの場合は右辺値を生成
+        // genを呼んでアドレスをraxに詰める
+        NodeKind::UnaryOp(op) => {
+            if *op == UnaryOpKind::Deref {
+                gen(node.lhs.as_ref().unwrap(), id);
+            }
+        }
         _ => {
             error::error("代入の左辺値が変数ではありません");
         }
@@ -199,8 +199,40 @@ pub fn gen(node: &Node, id: &mut i32) {
 
             match &node.kind {
                 NodeKind::BinaryOp(op) => match op {
-                    BinaryOpKind::Add => println!("  add rax, rdi"),
-                    BinaryOpKind::Sub => println!("  sub rax, rdi"),
+                    BinaryOpKind::Add => match &node.lhs.as_ref().unwrap().kind {
+                        NodeKind::LVar(lvar) => match lvar.ty.kind {
+                            TypeKind::Int => {
+                                println!("  add rax, rdi");
+                            }
+                            TypeKind::Ptr => {
+                                let size = match lvar.ty.ptr_to.as_ref().unwrap().kind {
+                                    TypeKind::Int => 4,
+                                    TypeKind::Ptr => 8,
+                                };
+
+                                println!("  imul rdi, {}", size);
+                                println!("  add rax, rdi");
+                            }
+                        },
+                        _ => println!("  add rax, rdi"),
+                    },
+                    BinaryOpKind::Sub => match &node.lhs.as_ref().unwrap().kind {
+                        NodeKind::LVar(lvar) => match lvar.ty.kind {
+                            TypeKind::Int => {
+                                println!("  sub rax, rdi");
+                            }
+                            TypeKind::Ptr => {
+                                let size = match lvar.ty.ptr_to.as_ref().unwrap().kind {
+                                    TypeKind::Int => 4,
+                                    TypeKind::Ptr => 8,
+                                };
+
+                                println!("  imul rdi, {}", size);
+                                println!("  sub rax, rdi");
+                            }
+                        },
+                        _ => println!("  sub rax, rdi"),
+                    },
                     BinaryOpKind::Mul => println!("  imul rax, rdi"),
                     BinaryOpKind::Div => {
                         println!("  cqo");

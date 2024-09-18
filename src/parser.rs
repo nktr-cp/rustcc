@@ -310,9 +310,9 @@ impl Parser {
             node = self.decl()?;
             self.expect(";")?;
         } else {
-					node = self.expr()?;
-					self.expect(";")?;
-				}
+            node = self.expr()?;
+            self.expect(";")?;
+        }
         Ok(node)
     }
 
@@ -500,20 +500,20 @@ impl Parser {
             let lvar = self.find_lvar(&name).cloned();
             // func を先に取得し、所有権を確保
             // let func = self.functions.iter().find(|f| f.name == name).cloned();
-						let func = Function {
-								name: name.clone(),
-								// 一旦戻り値の型は適当にする
-								// sizeofとか実装したらちゃんとやる
-								ty: Type {
-										kind: TypeKind::Int,
-										ptr_to: None,
-								},
-						};
+            let func = Function {
+                name: name.clone(),
+                // 一旦戻り値の型は適当にする
+                // sizeofとか実装したらちゃんとやる
+                ty: Type {
+                    kind: TypeKind::Int,
+                    ptr_to: None,
+                },
+            };
             self.pos += 1;
 
             if self.consume("(") {
-								// ここはいらなかった、
-								// 関数の索引をやるのはリンカの仕事
+                // ここはいらなかった、
+                // 関数の索引をやるのはリンカの仕事
                 // if func.is_none() {
                 //     return Err(format!("関数 '{}' が見つかりません", name));
                 // }
@@ -528,8 +528,7 @@ impl Parser {
                 } else {
                     args = self.arglist()?;
                     Ok(Node {
-                        kind: NodeKind::Fncall(func
-													, args),
+                        kind: NodeKind::Fncall(func, args),
                         lhs: None,
                         rhs: None,
                     })
