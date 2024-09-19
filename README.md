@@ -13,7 +13,7 @@ stmt       ::= expr ";"
              | "for" "(" expr? ";" expr? ";" expr? ")" stmt
              | "return" expr ";"
              | decl ";"
-decl       ::= type ident ("[" expr "]") ("=" init)?
+decl       ::= type ident ("[" num "]")? ("=" init)?
 init       ::= expr
              | "{" expr? ("," expr)* "}"
 expr       ::= assign
@@ -30,10 +30,11 @@ primary    ::= num
              | ident "[" expr "]"
              | "(" expr ")"
 arglist    ::= type ("," expr)*
-type       ::= base_type ("*" | "[" expr "]")*
+type       ::= base_type ("*" | "[" num "]")*
 base_type  ::= "int"
 ```
 note: 現状配列サイズの暗黙な指定はサポートしていない
+note: typeの中身はnumにする、exprは対応しない様にする (const変数に対応するなら必要かも)
 
 ## Acknowledgments
 - [低レイヤを知りたい人のためのCコンパイラ作成入門](https://www.sigbus.info/compilerbook)
