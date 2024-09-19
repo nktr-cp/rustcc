@@ -121,11 +121,8 @@ pub fn gen(node: &Node, id: &mut i32) {
             println!(".Lend{}:", local_id);
         }
         NodeKind::Block(stmts) => {
-            for (i, stmt) in stmts.iter().enumerate() {
+            for stmt in stmts.iter() {
                 gen(stmt, id);
-                if i != stmts.len() - 1 {
-                    println!("  pop rax");
-                }
             }
         }
         NodeKind::Fncall(lvar, args) => {

@@ -73,6 +73,7 @@ pub struct Node {
     pub kind: NodeKind,
     pub lhs: Option<Box<Node>>,
     pub rhs: Option<Box<Node>>,
+    pub ty: Type,
 }
 
 pub struct Parser {
@@ -81,6 +82,107 @@ pub struct Parser {
     fn_idx: usize,
     pub locals: Vec<HashMap<String, LVar>>, // function name -> local variables
     pub functions: Vec<Function>,
+}
+
+// 左右の子に応じてノードの型を決定する
+fn create_new_node(kind: NodeKind, lhs: Option<Box<Node>>, rhs: Option<Box<Node>>) -> Node {
+    let ty = match &kind {
+        NodeKind::BinaryOp(op) => match op {
+            BinaryOpKind::Add | BinaryOpKind::Sub => {
+                if let (Some(l), Some(r)) = (&lhs, &rhs) {
+                    if l.ty.kind == TypeKind::Ptr && r.ty.kind == TypeKind::Int {
+                        l.ty.clone()
+                    } else if l.ty.kind == TypeKind::Int && r.ty.kind == TypeKind::Ptr {
+                        r.ty.clone()
+                    } else {
+                        Type {
+                            kind: TypeKind::Int,
+                            ptr_to: None,
+                        }
+                    }
+                } else {
+                    Type {
+                        kind: TypeKind::Int,
+                        ptr_to: None,
+                    }
+                }
+            }
+            _ => Type {
+                kind: TypeKind::Int,
+                ptr_to: None,
+            },
+        },
+        NodeKind::UnaryOp(op) => match op {
+            UnaryOpKind::Ref => {
+                if let Some(l) = &lhs {
+                    Type {
+                        kind: TypeKind::Ptr,
+                        ptr_to: Some(Box::new(l.ty.clone())),
+                    }
+                } else {
+                    Type {
+                        kind: TypeKind::Ptr,
+                        ptr_to: Some(Box::new(Type {
+                            kind: TypeKind::Int,
+                            ptr_to: None,
+                        })),
+                    }
+                }
+            }
+            UnaryOpKind::Deref => {
+                if let Some(l) = &lhs {
+                    if let Some(ptr_to) = &l.ty.ptr_to {
+                        (**ptr_to).clone()
+                    } else {
+                        Type {
+                            kind: TypeKind::Int,
+                            ptr_to: None,
+                        }
+                    }
+                } else {
+                    Type {
+                        kind: TypeKind::Int,
+                        ptr_to: None,
+                    }
+                }
+            }
+        },
+        NodeKind::Comparison(_) => Type {
+            kind: TypeKind::Int,
+            ptr_to: None,
+        },
+        NodeKind::Num(_) => Type {
+            kind: TypeKind::Int,
+            ptr_to: None,
+        },
+        NodeKind::LVar(ref lvar) => lvar.ty.clone(),
+        NodeKind::Assign => {
+            if let Some(l) = &lhs {
+                l.ty.clone()
+            } else {
+                Type {
+                    kind: TypeKind::Int,
+                    ptr_to: None,
+                }
+            }
+        }
+        NodeKind::Return => Type {
+            kind: TypeKind::Int,
+            ptr_to: None,
+        },
+        NodeKind::Block(_) => Type {
+            kind: TypeKind::Int,
+            ptr_to: None,
+        },
+        NodeKind::Fncall(ref func, _) => func.ty.clone(),
+        NodeKind::Fndef(ref func, _, _) => func.ty.clone(),
+        NodeKind::For | NodeKind::While | NodeKind::If | NodeKind::Else => Type {
+            kind: TypeKind::Int,
+            ptr_to: None,
+        },
+    };
+
+    Node { kind, lhs, rhs, ty }
 }
 
 impl Parser {
@@ -180,15 +282,16 @@ impl Parser {
 
         let body = self.stmt()?;
 
-        Ok(Node {
-            kind: NodeKind::Fndef(
-                func,
-                params,
+        let rhs = Some(Box::new(body));
+        Ok(create_new_node(
+            NodeKind::Fndef(
+                func.clone(),
+                params.clone(),
                 self.locals[self.fn_idx].values().cloned().collect(),
             ),
-            lhs: None,
-            rhs: Some(Box::new(body)),
-        })
+            None,
+            rhs,
+        ))
     }
 
     fn paramlist(&mut self) -> Result<Vec<Node>, String> {
@@ -197,11 +300,7 @@ impl Parser {
         loop {
             let ty = self.ty()?;
             let lvar = self.create_lvar(&self.tokens[self.pos].str.clone(), ty.clone());
-            params.push(Node {
-                kind: NodeKind::LVar(lvar),
-                lhs: None,
-                rhs: None,
-            });
+            params.push(create_new_node(NodeKind::LVar(lvar), None, None));
             self.pos += 1;
             if !self.consume(",") {
                 break;
@@ -220,34 +319,14 @@ impl Parser {
                 }
                 stmts.push(self.stmt()?);
             }
-            node = Node {
-                kind: NodeKind::Block(stmts),
-                lhs: None,
-                rhs: None,
-            }
+            node = create_new_node(NodeKind::Block(stmts), None, None);
         } else if self.consume("return") {
-            node = Node {
-                kind: NodeKind::Return,
-                lhs: Some(Box::new(self.expr()?)),
-                rhs: None,
-            };
+            node = create_new_node(NodeKind::Return, Some(Box::new(self.expr()?)), None);
             self.expect(";")?;
         } else if self.consume("for") {
-            let mut init = Node {
-                kind: NodeKind::Num(0),
-                lhs: None,
-                rhs: None,
-            };
-            let mut cond = Node {
-                kind: NodeKind::Num(1), // default should be true
-                lhs: None,
-                rhs: None,
-            };
-            let mut inc = Node {
-                kind: NodeKind::Num(0),
-                lhs: None,
-                rhs: None,
-            };
+            let mut init = create_new_node(NodeKind::Num(0), None, None);
+            let mut cond = create_new_node(NodeKind::Num(1), None, None);
+            let mut inc = create_new_node(NodeKind::Num(0), None, None);
             self.expect("(")?;
             if !self.consume(";") {
                 init = self.expr()?;
@@ -261,28 +340,20 @@ impl Parser {
                 inc = self.expr()?;
                 self.expect(")")?;
             }
-            node = Node {
-                kind: NodeKind::For,
-                lhs: Some(Box::new(init)),
-                rhs: Some(Box::new(Node {
-                    kind: NodeKind::For,
-                    lhs: Some(Box::new(cond)),
-                    rhs: Some(Box::new(Node {
-                        kind: NodeKind::For,
-                        lhs: Some(Box::new(inc)),
-                        rhs: Some(Box::new(self.stmt()?)),
-                    })),
-                })),
-            };
+            let lhs = Some(Box::new(init));
+            let rrhs = create_new_node(
+                NodeKind::For,
+                Some(Box::new(inc)),
+                Some(Box::new(self.stmt()?)),
+            );
+            let rhs = create_new_node(NodeKind::For, Some(Box::new(cond)), Some(Box::new(rrhs)));
+            node = create_new_node(NodeKind::For, lhs, Some(Box::new(rhs)));
         } else if self.consume("while") {
             self.expect("(")?;
             let cond = self.expr()?;
             self.expect(")")?;
-            node = Node {
-                kind: NodeKind::While,
-                lhs: Some(Box::new(cond)),
-                rhs: Some(Box::new(self.stmt()?)),
-            };
+            let rhs = Some(Box::new(self.stmt()?));
+            node = create_new_node(NodeKind::While, Some(Box::new(cond)), rhs);
         } else if self.consume("if") {
             self.expect("(")?;
             let cond = self.expr()?;
@@ -290,21 +361,11 @@ impl Parser {
             let then = self.stmt()?;
             if self.consume("else") {
                 let els = self.stmt()?;
-                node = Node {
-                    kind: NodeKind::If,
-                    lhs: Some(Box::new(cond)),
-                    rhs: Some(Box::new(Node {
-                        kind: NodeKind::Else,
-                        lhs: Some(Box::new(then)),
-                        rhs: Some(Box::new(els)),
-                    })),
-                };
+                let rhs =
+                    create_new_node(NodeKind::Else, Some(Box::new(then)), Some(Box::new(els)));
+                node = create_new_node(NodeKind::If, Some(Box::new(cond)), Some(Box::new(rhs)));
             } else {
-                node = Node {
-                    kind: NodeKind::If,
-                    lhs: Some(Box::new(cond)),
-                    rhs: Some(Box::new(then)),
-                };
+                node = create_new_node(NodeKind::If, Some(Box::new(cond)), Some(Box::new(then)));
             }
         } else if self.tokens[self.pos].str == "int" {
             node = self.decl()?;
@@ -322,21 +383,14 @@ impl Parser {
         let lvar = self.create_lvar(&self.tokens[self.pos].str.clone(), ty);
         self.pos += 1;
         if self.consume("=") {
-            node = Node {
-                kind: NodeKind::Assign,
-                lhs: Some(Box::new(Node {
-                    kind: NodeKind::LVar(lvar.clone()),
-                    lhs: None,
-                    rhs: None,
-                })),
-                rhs: Some(Box::new(self.expr()?)),
-            };
+            let lhs = create_new_node(NodeKind::LVar(lvar.clone()), None, None);
+            node = create_new_node(
+                NodeKind::Assign,
+                Some(Box::new(lhs)),
+                Some(Box::new(self.expr()?)),
+            );
         } else {
-            node = Node {
-                kind: NodeKind::LVar(lvar.clone()),
-                lhs: None,
-                rhs: None,
-            };
+            node = create_new_node(NodeKind::LVar(lvar.clone()), None, None);
         }
         Ok(node)
     }
@@ -349,11 +403,11 @@ impl Parser {
         let mut node = self.equality()?;
 
         if self.consume("=") {
-            node = Node {
-                kind: NodeKind::Assign,
-                lhs: Some(Box::new(node)),
-                rhs: Some(Box::new(self.assign()?)),
-            };
+            node = create_new_node(
+                NodeKind::Assign,
+                Some(Box::new(node)),
+                Some(Box::new(self.assign()?)),
+            );
         }
 
         return Ok(node);
@@ -364,17 +418,13 @@ impl Parser {
 
         loop {
             if self.consume("==") {
-                node = Node {
-                    kind: NodeKind::Comparison(ComparisonOpKind::Eq),
-                    lhs: Some(Box::new(node)),
-                    rhs: Some(Box::new(self.relational()?)),
-                };
+                let lhs = Some(Box::new(node));
+                let rhs = Some(Box::new(self.relational()?));
+                node = create_new_node(NodeKind::Comparison(ComparisonOpKind::Eq), lhs, rhs);
             } else if self.consume("!=") {
-                node = Node {
-                    kind: NodeKind::Comparison(ComparisonOpKind::Nq),
-                    lhs: Some(Box::new(node)),
-                    rhs: Some(Box::new(self.relational()?)),
-                };
+                let lhs = Some(Box::new(node));
+                let rhs = Some(Box::new(self.relational()?));
+                node = create_new_node(NodeKind::Comparison(ComparisonOpKind::Nq), lhs, rhs);
             } else {
                 return Ok(node);
             }
@@ -386,29 +436,21 @@ impl Parser {
 
         loop {
             if self.consume("<") {
-                node = Node {
-                    kind: NodeKind::Comparison(ComparisonOpKind::Lt),
-                    lhs: Some(Box::new(node)),
-                    rhs: Some(Box::new(self.add()?)),
-                };
+                let lhs = Some(Box::new(node));
+                let rhs = Some(Box::new(self.add()?));
+                node = create_new_node(NodeKind::Comparison(ComparisonOpKind::Lt), lhs, rhs);
             } else if self.consume("<=") {
-                node = Node {
-                    kind: NodeKind::Comparison(ComparisonOpKind::Le),
-                    lhs: Some(Box::new(node)),
-                    rhs: Some(Box::new(self.add()?)),
-                };
+                let lhs = Some(Box::new(node));
+                let rhs = Some(Box::new(self.add()?));
+                node = create_new_node(NodeKind::Comparison(ComparisonOpKind::Le), lhs, rhs);
             } else if self.consume(">") {
-                node = Node {
-                    kind: NodeKind::Comparison(ComparisonOpKind::Gt),
-                    lhs: Some(Box::new(node)),
-                    rhs: Some(Box::new(self.add()?)),
-                };
+                let lhs = Some(Box::new(node));
+                let rhs = Some(Box::new(self.add()?));
+                node = create_new_node(NodeKind::Comparison(ComparisonOpKind::Gt), lhs, rhs);
             } else if self.consume(">=") {
-                node = Node {
-                    kind: NodeKind::Comparison(ComparisonOpKind::Ge),
-                    lhs: Some(Box::new(node)),
-                    rhs: Some(Box::new(self.add()?)),
-                };
+                let lhs = Some(Box::new(node));
+                let rhs = Some(Box::new(self.add()?));
+                node = create_new_node(NodeKind::Comparison(ComparisonOpKind::Ge), lhs, rhs);
             } else {
                 return Ok(node);
             }
@@ -420,17 +462,13 @@ impl Parser {
 
         loop {
             if self.consume("+") {
-                node = Node {
-                    kind: NodeKind::BinaryOp(BinaryOpKind::Add),
-                    lhs: Some(Box::new(node)),
-                    rhs: Some(Box::new(self.mul()?)),
-                };
+                let lhs = Some(Box::new(node));
+                let rhs = Some(Box::new(self.mul()?));
+                node = create_new_node(NodeKind::BinaryOp(BinaryOpKind::Add), lhs, rhs);
             } else if self.consume("-") {
-                node = Node {
-                    kind: NodeKind::BinaryOp(BinaryOpKind::Sub),
-                    lhs: Some(Box::new(node)),
-                    rhs: Some(Box::new(self.mul()?)),
-                };
+                let lhs = Some(Box::new(node));
+                let rhs = Some(Box::new(self.mul()?));
+                node = create_new_node(NodeKind::BinaryOp(BinaryOpKind::Sub), lhs, rhs);
             } else {
                 return Ok(node);
             }
@@ -442,17 +480,13 @@ impl Parser {
 
         loop {
             if self.consume("*") {
-                node = Node {
-                    kind: NodeKind::BinaryOp(BinaryOpKind::Mul),
-                    lhs: Some(Box::new(node)),
-                    rhs: Some(Box::new(self.unary()?)),
-                };
+                let lhs = Some(Box::new(node));
+                let rhs = Some(Box::new(self.unary()?));
+                node = create_new_node(NodeKind::BinaryOp(BinaryOpKind::Mul), lhs, rhs);
             } else if self.consume("/") {
-                node = Node {
-                    kind: NodeKind::BinaryOp(BinaryOpKind::Div),
-                    lhs: Some(Box::new(node)),
-                    rhs: Some(Box::new(self.unary()?)),
-                };
+                let lhs = Some(Box::new(node));
+                let rhs = Some(Box::new(self.unary()?));
+                node = create_new_node(NodeKind::BinaryOp(BinaryOpKind::Div), lhs, rhs);
             } else {
                 return Ok(node);
             }
@@ -464,27 +498,35 @@ impl Parser {
             return self.primary();
         } else if self.consume("-") {
             // 0 - x として扱う
-            return Ok(Node {
-                kind: NodeKind::BinaryOp(BinaryOpKind::Sub),
-                lhs: Some(Box::new(Node {
-                    kind: NodeKind::Num(0),
-                    lhs: None,
-                    rhs: None,
-                })),
-                rhs: Some(Box::new(self.primary()?)),
-            });
+            let lhs = Some(Box::new(create_new_node(NodeKind::Num(0), None, None)));
+            let rhs = Some(Box::new(self.primary()?));
+            return Ok(create_new_node(
+                NodeKind::BinaryOp(BinaryOpKind::Sub),
+                lhs,
+                rhs,
+            ));
         } else if self.consume("&") {
-            return Ok(Node {
-                kind: NodeKind::UnaryOp(UnaryOpKind::Ref),
-                lhs: Some(Box::new(self.unary()?)),
-                rhs: None,
-            });
+            let lhs = Some(Box::new(self.unary()?));
+            return Ok(create_new_node(
+                NodeKind::UnaryOp(UnaryOpKind::Ref),
+                lhs,
+                None,
+            ));
         } else if self.consume("*") {
-            return Ok(Node {
-                kind: NodeKind::UnaryOp(UnaryOpKind::Deref),
-                lhs: Some(Box::new(self.unary()?)),
-                rhs: None,
-            });
+            let lhs = Some(Box::new(self.unary()?));
+            return Ok(create_new_node(
+                NodeKind::UnaryOp(UnaryOpKind::Deref),
+                lhs,
+                None,
+            ));
+        } else if self.consume("sizeof") {
+            let node = self.unary()?;
+
+            if node.ty.kind == TypeKind::Int {
+                return Ok(create_new_node(NodeKind::Num(4), None, None));
+            } else {
+                return Ok(create_new_node(NodeKind::Num(8), None, None));
+            }
         } else {
             return self.primary();
         }
@@ -498,8 +540,6 @@ impl Parser {
         } else if self.tokens[self.pos].kind == TokenKind::Ident {
             let name = self.tokens[self.pos].str.clone();
             let lvar = self.find_lvar(&name).cloned();
-            // func を先に取得し、所有権を確保
-            // let func = self.functions.iter().find(|f| f.name == name).cloned();
             let func = Function {
                 name: name.clone(),
                 // 一旦戻り値の型は適当にする
@@ -512,44 +552,26 @@ impl Parser {
             self.pos += 1;
 
             if self.consume("(") {
-                // ここはいらなかった、
-                // 関数の索引をやるのはリンカの仕事
-                // if func.is_none() {
-                //     return Err(format!("関数 '{}' が見つかりません", name));
-                // }
-
                 let mut args = Vec::new();
                 if self.consume(")") {
-                    Ok(Node {
-                        kind: NodeKind::Fncall(func, args),
-                        lhs: None,
-                        rhs: None,
-                    })
+                    return Ok(create_new_node(NodeKind::Fncall(func, args), None, None));
                 } else {
                     args = self.arglist()?;
-                    Ok(Node {
-                        kind: NodeKind::Fncall(func, args),
-                        lhs: None,
-                        rhs: None,
-                    })
+                    return Ok(create_new_node(NodeKind::Fncall(func, args), None, None));
                 }
             } else {
                 if lvar.is_none() {
                     return Err(format!("変数 '{}' が見つかりません", name));
                 } else {
-                    Ok(Node {
-                        kind: NodeKind::LVar(lvar.unwrap()),
-                        lhs: None,
-                        rhs: None,
-                    })
+                    return Ok(create_new_node(NodeKind::LVar(lvar.unwrap()), None, None));
                 }
             }
         } else {
-            Ok(Node {
-                kind: NodeKind::Num(self.expect_number()?),
-                lhs: None,
-                rhs: None,
-            })
+            Ok(create_new_node(
+                NodeKind::Num(self.expect_number()?),
+                None,
+                None,
+            ))
         }
     }
 

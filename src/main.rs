@@ -19,8 +19,10 @@ fn main() {
     println!(".intel_syntax noprefix");
 
     let mut id = 0;
-    for node in code.iter() {
+    for (i, node) in code.iter().enumerate() {
         gen::gen(node, &mut id);
-        println!("  pop rax");
+        if i != code.len() - 1 {
+            println!("  pop rax");
+        }
     }
 }

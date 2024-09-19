@@ -10,6 +10,7 @@ pub enum TokenKind {
     If,
     Else,
     Num,
+    Sizeof,
     Eof,
 }
 
@@ -134,6 +135,14 @@ pub fn tokenize(input: &str) -> Vec<Token> {
                 "int" => {
                     tokens.push(Token {
                         kind: TokenKind::Reserved,
+                        val: None,
+                        str: ident,
+                    });
+                    continue;
+                }
+                "sizeof" => {
+                    tokens.push(Token {
+                        kind: TokenKind::Sizeof,
                         val: None,
                         str: ident,
                     });

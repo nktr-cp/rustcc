@@ -17,6 +17,27 @@ assert() {
   fi
 }
 
+assert 42 "
+int main() {
+	int x = 3;
+	int *y = &x;
+
+	if (sizeof(3) != 4) return 1;
+	if (sizeof(x) != 4) return 2;
+	if (sizeof(y) != 8) return 3;
+
+	if (sizeof(x + 3) != 4) return 4;
+	if (sizeof(y + 3) != 8) return 5;
+	if (sizeof(*y) != 4) return 6;
+
+	if (sizeof(1) != 4) return 7;
+
+	if (sizeof(sizeof(1)) != 4) return 8;
+
+	return 42;
+}
+"
+
 assert 42 "int f() {return 10;} int main() {return 42;}"
 
 assert 55 "
