@@ -13,7 +13,9 @@ stmt       ::= expr ";"
              | "for" "(" expr? ";" expr? ";" expr? ")" stmt
              | "return" expr ";"
              | decl ";"
-decl       ::= type ident ("=" expr)?
+decl       ::= type ident ("[" expr "]") ("=" init)?
+init       ::= expr
+             | "{" expr? ("," expr)* "}"
 expr       ::= assign
 assign     ::= equlatity ("=" assign)?
 equality   ::= relational ("==" relational | "!=" relational)*
@@ -25,11 +27,13 @@ unary      ::= "sizeof" unary
              | ("*" | "&") unary
 primary    ::= num
              | ident ("(" arglist? ")")?
+             | ident "[" expr "]"
              | "(" expr ")"
 arglist    ::= type ("," expr)*
-type       ::= base_type "*"*
+type       ::= base_type ("*" | "[" expr "]")*
 base_type  ::= "int"
 ```
+note: 現状配列サイズの暗黙な指定はサポートしていない
 
 ## Acknowledgments
 - [低レイヤを知りたい人のためのCコンパイラ作成入門](https://www.sigbus.info/compilerbook)
