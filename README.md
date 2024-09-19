@@ -13,9 +13,9 @@ stmt       ::= expr ";"
              | "for" "(" expr? ";" expr? ";" expr? ")" stmt
              | "return" expr ";"
              | decl ";"
-decl       ::= type ident ("[" num "]")? ("=" init)?
+decl       ::= type ident ("[" num "]")* ("=" init)?
 init       ::= expr
-             | "{" expr? ("," expr)* "}"
+             | ("{" expr? ("," expr)* "}")+
 expr       ::= assign
 assign     ::= equlatity ("=" assign)?
 equality   ::= relational ("==" relational | "!=" relational)*
@@ -27,14 +27,17 @@ unary      ::= "sizeof" unary
              | ("*" | "&") unary
 primary    ::= num
              | ident ("(" arglist? ")")?
-             | ident "[" expr "]"
+             | ident ("[" expr "]")+
              | "(" expr ")"
-arglist    ::= type ("," expr)*
-type       ::= base_type ("*" | "[" num "]")*
+arglist    ::= expr ("," expr)*
+type       ::= base_type "*"*
 base_type  ::= "int"
 ```
-note: 現状配列サイズの暗黙な指定はサポートしていない
-note: typeの中身はnumにする、exprは対応しない様にする (const変数に対応するなら必要かも)
+
+### note
+- 配列の`{}`による初期化は1次元まで
+- 現状配列サイズの暗黙な指定はサポートしていない
+- typeの中身はnumにする、exprは対応しない様にする (const変数に対応するなら必要かも)
 
 ## Acknowledgments
 - [低レイヤを知りたい人のためのCコンパイラ作成入門](https://www.sigbus.info/compilerbook)
