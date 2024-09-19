@@ -35,7 +35,7 @@ pub fn tokenize(input: &str) -> Vec<Token> {
             continue;
         }
 
-        if "+-*/();{},&".contains(c) {
+        if "+-*/();{},&[]".contains(c) {
             tokens.push(Token {
                 kind: TokenKind::Reserved,
                 val: None,

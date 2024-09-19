@@ -201,10 +201,11 @@ pub fn gen(node: &Node, id: &mut i32) {
                             TypeKind::Int => {
                                 println!("  add rax, rdi");
                             }
-                            TypeKind::Ptr => {
+                            TypeKind::Ptr | TypeKind::Arr => {
                                 let size = match lvar.ty.ptr_to.as_ref().unwrap().kind {
                                     TypeKind::Int => 4,
                                     TypeKind::Ptr => 8,
+																		TypeKind::Arr => 8,
                                 };
 
                                 println!("  imul rdi, {}", size);
@@ -218,10 +219,11 @@ pub fn gen(node: &Node, id: &mut i32) {
                             TypeKind::Int => {
                                 println!("  sub rax, rdi");
                             }
-                            TypeKind::Ptr => {
+                            TypeKind::Ptr | TypeKind::Arr => {
                                 let size = match lvar.ty.ptr_to.as_ref().unwrap().kind {
                                     TypeKind::Int => 4,
                                     TypeKind::Ptr => 8,
+																		TypeKind::Arr => 8,
                                 };
 
                                 println!("  imul rdi, {}", size);

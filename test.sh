@@ -19,6 +19,29 @@ assert() {
 
 assert 42 "
 int main() {
+	int a[2];
+	a[0] = 10;
+	a[1] = 32;
+	int *p;
+	p = a;
+	return *p + *(p + 1);
+}
+"
+
+assert 42 "
+int main() {
+	int a[2];
+	*a = 10;
+	*(a + 1) = 22;
+	int *p;
+	p = a;
+	p[1] = 32;
+	return *p + *(a + 1);
+}
+"
+
+assert 42 "
+int main() {
 	int x = 3;
 	int *y = &x;
 

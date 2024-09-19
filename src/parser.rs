@@ -29,12 +29,14 @@ pub enum ComparisonOpKind {
 pub enum TypeKind {
     Int,
     Ptr,
+    Arr,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Type {
     pub kind: TypeKind,
     pub ptr_to: Option<Box<Type>>,
+    pub arr_size: usize,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -98,18 +100,21 @@ fn create_new_node(kind: NodeKind, lhs: Option<Box<Node>>, rhs: Option<Box<Node>
                         Type {
                             kind: TypeKind::Int,
                             ptr_to: None,
+                            arr_size: 1,
                         }
                     }
                 } else {
                     Type {
                         kind: TypeKind::Int,
                         ptr_to: None,
+                        arr_size: 1,
                     }
                 }
             }
             _ => Type {
                 kind: TypeKind::Int,
                 ptr_to: None,
+                arr_size: 1,
             },
         },
         NodeKind::UnaryOp(op) => match op {
@@ -118,6 +123,7 @@ fn create_new_node(kind: NodeKind, lhs: Option<Box<Node>>, rhs: Option<Box<Node>
                     Type {
                         kind: TypeKind::Ptr,
                         ptr_to: Some(Box::new(l.ty.clone())),
+                        arr_size: 1,
                     }
                 } else {
                     Type {
@@ -125,7 +131,9 @@ fn create_new_node(kind: NodeKind, lhs: Option<Box<Node>>, rhs: Option<Box<Node>
                         ptr_to: Some(Box::new(Type {
                             kind: TypeKind::Int,
                             ptr_to: None,
+                            arr_size: 1,
                         })),
+                        arr_size: 1,
                     }
                 }
             }
@@ -137,12 +145,14 @@ fn create_new_node(kind: NodeKind, lhs: Option<Box<Node>>, rhs: Option<Box<Node>
                         Type {
                             kind: TypeKind::Int,
                             ptr_to: None,
+                            arr_size: 1,
                         }
                     }
                 } else {
                     Type {
                         kind: TypeKind::Int,
                         ptr_to: None,
+                        arr_size: 1,
                     }
                 }
             }
@@ -150,10 +160,13 @@ fn create_new_node(kind: NodeKind, lhs: Option<Box<Node>>, rhs: Option<Box<Node>
         NodeKind::Comparison(_) => Type {
             kind: TypeKind::Int,
             ptr_to: None,
+            arr_size: 1,
         },
         NodeKind::Num(_) => Type {
             kind: TypeKind::Int,
             ptr_to: None,
+
+            arr_size: 1,
         },
         NodeKind::LVar(ref lvar) => lvar.ty.clone(),
         NodeKind::Assign => {
@@ -163,22 +176,26 @@ fn create_new_node(kind: NodeKind, lhs: Option<Box<Node>>, rhs: Option<Box<Node>
                 Type {
                     kind: TypeKind::Int,
                     ptr_to: None,
+                    arr_size: 1,
                 }
             }
         }
         NodeKind::Return => Type {
             kind: TypeKind::Int,
             ptr_to: None,
+            arr_size: 1,
         },
         NodeKind::Block(_) => Type {
             kind: TypeKind::Int,
             ptr_to: None,
+            arr_size: 1,
         },
         NodeKind::Fncall(ref func, _) => func.ty.clone(),
         NodeKind::Fndef(ref func, _, _) => func.ty.clone(),
         NodeKind::For | NodeKind::While | NodeKind::If | NodeKind::Else => Type {
             kind: TypeKind::Int,
             ptr_to: None,
+            arr_size: 1,
         },
     };
 
@@ -197,12 +214,19 @@ impl Parser {
     }
 
     fn create_lvar(&mut self, name: &str, ty: Type) -> LVar {
-        if let Some(lvar) = self.locals[self.fn_idx].get(name) {
-            return lvar.clone();
+        let mut offset = self.locals[self.fn_idx]
+            .values()
+            .map(|lvar| lvar.offset)
+            .max()
+            .unwrap_or(0);
+        if ty.kind == TypeKind::Int {
+            offset += 8 * ty.arr_size;
+        } else {
+            offset += 8 * ty.arr_size;
         }
         let lvar = LVar {
             name: name.to_string(),
-            offset: self.locals[self.fn_idx].len() * 8 + 8,
+            offset: offset,
             ty: ty.clone(),
         };
         self.locals[self.fn_idx].insert(name.to_string(), lvar.clone());
@@ -379,9 +403,18 @@ impl Parser {
 
     fn decl(&mut self) -> Result<Node, String> {
         let node;
-        let ty = self.ty()?;
-        let lvar = self.create_lvar(&self.tokens[self.pos].str.clone(), ty);
+        let mut ty = self.ty()?;
+				let name = self.tokens[self.pos].str.clone();
         self.pos += 1;
+				if self.consume("[") {
+					let num = self.expect_number()?;
+					self.expect("]")?;
+					ty.ptr_to = Some(Box::new(ty.clone()));
+					ty.kind = TypeKind::Arr;
+					ty.arr_size = num as usize;
+				}
+				let lvar = self.create_lvar(&name, ty.clone());
+
         if self.consume("=") {
             let lhs = create_new_node(NodeKind::LVar(lvar.clone()), None, None);
             node = create_new_node(
@@ -547,6 +580,7 @@ impl Parser {
                 ty: Type {
                     kind: TypeKind::Int,
                     ptr_to: None,
+                    arr_size: 1,
                 },
             };
             self.pos += 1;
@@ -559,7 +593,22 @@ impl Parser {
                     args = self.arglist()?;
                     return Ok(create_new_node(NodeKind::Fncall(func, args), None, None));
                 }
-            } else {
+            } else if self.consume("[") {
+							if lvar.is_none() {
+								return Err(format!("変数 '{}' が見つかりません", name));
+							}
+
+							let node = self.expr()?;
+							self.expect("]")?;
+
+							// a[3] -> *(a+3)
+							let llhs = Some(Box::new(create_new_node(NodeKind::LVar(lvar.unwrap()), None, None)));
+							let lrhs = Some(Box::new(node));
+							// lhs: a+3 
+							let lhs = create_new_node(NodeKind::BinaryOp(BinaryOpKind::Add), llhs, lrhs);
+							// *lhs
+							return Ok(create_new_node(NodeKind::UnaryOp(UnaryOpKind::Deref), Some(Box::new(lhs)), None));
+						} else {
                 if lvar.is_none() {
                     return Err(format!("変数 '{}' が見つかりません", name));
                 } else {
@@ -599,8 +648,17 @@ impl Parser {
                 ty = Type {
                     kind: TypeKind::Ptr,
                     ptr_to: Some(Box::new(ty)),
+                    arr_size: 1,
                 };
-            } else {
+            } else if self.consume("[") {
+							// let node = self.expr()?;
+							let num = self.expect_number()?;
+							ty = Type {
+								kind: TypeKind::Arr,
+								ptr_to: Some(Box::new(ty)),
+								arr_size: num as usize,
+							};
+						} else {
                 break;
             }
         }
@@ -613,6 +671,7 @@ impl Parser {
             Ok(Type {
                 kind: TypeKind::Int,
                 ptr_to: None,
+                arr_size: 1,
             })
         } else {
             Err(format!(
