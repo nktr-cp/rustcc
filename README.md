@@ -13,9 +13,7 @@ stmt       ::= expr ";"
              | "for" "(" expr? ";" expr? ";" expr? ")" stmt
              | "return" expr ";"
              | decl ";"
-decl       ::= type ident ("[" num "]")* ("=" init)?
-init       ::= expr
-             | ("{" expr? ("," expr)* "}")+
+decl       ::= type ident ("[" num "]")* ("=" expr)?
 expr       ::= assign
 assign     ::= equlatity ("=" assign)?
 equality   ::= relational ("==" relational | "!=" relational)*
@@ -35,8 +33,6 @@ base_type  ::= "int"
 ```
 
 ### note
-- 配列の`{}`による初期化は1次元まで
-- 現状配列サイズの暗黙な指定はサポートしていない
 - typeの中身はnumにする、exprは対応しない様にする (const変数に対応するなら必要かも)
 
 ## Acknowledgments

@@ -1,5 +1,6 @@
 use crate::error;
 use crate::parser::{BinaryOpKind, ComparisonOpKind, Node, NodeKind, TypeKind, UnaryOpKind};
+use crate::parser::get_type_size;
 
 fn gen_lval(node: &Node, id: &mut i32) {
     match &node.kind {
@@ -196,42 +197,28 @@ pub fn gen(node: &Node, id: &mut i32) {
 
             match &node.kind {
                 NodeKind::BinaryOp(op) => match op {
-                    BinaryOpKind::Add => match &node.lhs.as_ref().unwrap().kind {
-                        NodeKind::LVar(lvar) => match lvar.ty.kind {
-                            TypeKind::Int => {
-                                println!("  add rax, rdi");
-                            }
-                            TypeKind::Ptr | TypeKind::Arr => {
-                                let size = match lvar.ty.ptr_to.as_ref().unwrap().kind {
-                                    TypeKind::Int => 4,
-                                    TypeKind::Ptr => 8,
-                                    TypeKind::Arr => 8,
-                                };
+                    BinaryOpKind::Add => {
+											if matches!(node.ty.kind, TypeKind::Ptr | TypeKind::Arr) {
+												if matches!(node.lhs.as_ref().unwrap().ty.kind, TypeKind::Ptr | TypeKind::Arr) {
+													println!("  imul rdi, {}", get_type_size(&node.ty.ptr_to.as_ref().unwrap()));
+												} else {
+													println!("  imul rax, {}", get_type_size(&node.ty.ptr_to.as_ref().unwrap()));
+												}
+											}
 
-                                println!("  imul rdi, {}", size);
-                                println!("  add rax, rdi");
-                            }
-                        },
-                        _ => println!("  add rax, rdi"),
-                    },
-                    BinaryOpKind::Sub => match &node.lhs.as_ref().unwrap().kind {
-                        NodeKind::LVar(lvar) => match lvar.ty.kind {
-                            TypeKind::Int => {
-                                println!("  sub rax, rdi");
-                            }
-                            TypeKind::Ptr | TypeKind::Arr => {
-                                let size = match lvar.ty.ptr_to.as_ref().unwrap().kind {
-                                    TypeKind::Int => 4,
-                                    TypeKind::Ptr => 8,
-                                    TypeKind::Arr => 8,
-                                };
+											println!("  add rax, rdi");
+                    }
+                    BinaryOpKind::Sub => {
+												if matches!(node.ty.kind, TypeKind::Ptr | TypeKind::Arr) {
+													if matches!(node.lhs.as_ref().unwrap().ty.kind, TypeKind::Ptr | TypeKind::Arr) {
+														println!("  imul rdi, {}", get_type_size(&node.ty.ptr_to.as_ref().unwrap()));
+													} else {
+														println!("  imul rax, {}", get_type_size(&node.ty.ptr_to.as_ref().unwrap()));
+													}
+												}
 
-                                println!("  imul rdi, {}", size);
-                                println!("  sub rax, rdi");
-                            }
-                        },
-                        _ => println!("  sub rax, rdi"),
-                    },
+												println!("  sub rax, rdi");
+											}
                     BinaryOpKind::Mul => println!("  imul rax, rdi"),
                     BinaryOpKind::Div => {
                         println!("  cqo");

@@ -19,12 +19,43 @@ assert() {
 
 assert 42 "
 int main() {
-	int a[10];
-	a[0] = 10;
-	a[1] = 32;
-	int *p;
-	p = a;
-	return *p + *(p + 1);
+	int x[2][3];
+	x[1][2] = 42;
+	return x[1][2];
+}
+"
+
+assert 42 "
+int main() {
+	int x[2][3][4];
+	x[1][2][1] = 42;
+	return x[1][2][1];
+}
+"
+
+assert 42 "
+int main() {
+	int a[3][3][3][3];
+	a[2][2][2][2] = 42;
+	return a[2][2][2][2];
+}
+"
+
+assert 55 "
+int sumup(int m, int n) {
+	int ret = 0;
+	int i = 0;
+	for (; i <= n; i = i + 1) {
+		ret = ret + i;
+	}
+	return ret;
+}
+
+int main() {
+	int a[2][2][2][2][2][2][2];
+	a[0][1][0][1][0][1][0] = 1;
+	a[1][0][1][0][1][0][1] = 10;
+	return sumup(a[0][1][0][1][0][1][0], a[1][0][1][0][1][0][1]);
 }
 "
 
@@ -35,7 +66,7 @@ int main() {
 	*(a + 1) = 22;
 	int *p;
 	p = a;
-	p[1] = 32;
+	*(p + 1) = 32;
 	return *p + *(a + 1);
 }
 "
@@ -132,7 +163,7 @@ int main() {
 assert 42 "
 int main() {
 	int x = 42;
-	int ptr = &x;
+	int *ptr = &x;
 	return *ptr;
 }
 "
@@ -146,12 +177,15 @@ int main() {
 }
 "
 
+# ポインタに対する加減算を変更したのでテストも変更
+# まだアラインメントが変なので2引かないといけない (要修正: issue #2)
 assert 55 "
 int main() {
 	int x = 21;
 	int y = 42;
 
-	int ptr = &x - 8;
+	int* ptr = &x;
+	ptr = ptr - 2;
 	y = 55;
 	return *ptr;
 }

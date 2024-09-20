@@ -88,121 +88,106 @@ pub struct Parser {
     stack_size: usize,
 }
 
+pub fn get_type_size(ty: &Type) -> usize {
+	match &ty.kind {
+			TypeKind::Int => 4,
+			TypeKind::Ptr => 8,
+			TypeKind::Arr => ty.arr_size * get_type_size(ty.ptr_to.as_ref().unwrap()),
+	}
+}
+
 // 左右の子に応じてノードの型を決定する
 fn create_new_node(kind: NodeKind, lhs: Option<Box<Node>>, rhs: Option<Box<Node>>) -> Node {
-    let ty = match &kind {
-        NodeKind::BinaryOp(op) => match op {
-            BinaryOpKind::Add | BinaryOpKind::Sub => {
-                if let (Some(l), Some(r)) = (&lhs, &rhs) {
-                    if l.ty.kind == TypeKind::Ptr && r.ty.kind == TypeKind::Int {
-                        l.ty.clone()
-                    } else if l.ty.kind == TypeKind::Int && r.ty.kind == TypeKind::Ptr {
-                        r.ty.clone()
-                    } else {
-                        Type {
-                            kind: TypeKind::Int,
-                            ptr_to: None,
-                            arr_size: 1,
-                        }
-                    }
-                } else {
-                    Type {
-                        kind: TypeKind::Int,
-                        ptr_to: None,
-                        arr_size: 1,
-                    }
-                }
-            }
-            _ => Type {
-                kind: TypeKind::Int,
-                ptr_to: None,
-                arr_size: 1,
-            },
-        },
-        NodeKind::UnaryOp(op) => match op {
-            UnaryOpKind::Ref => {
-                if let Some(l) = &lhs {
-                    Type {
-                        kind: TypeKind::Ptr,
-                        ptr_to: Some(Box::new(l.ty.clone())),
-                        arr_size: 1,
-                    }
-                } else {
-                    Type {
-                        kind: TypeKind::Ptr,
-                        ptr_to: Some(Box::new(Type {
-                            kind: TypeKind::Int,
-                            ptr_to: None,
-                            arr_size: 1,
-                        })),
-                        arr_size: 1,
-                    }
-                }
-            }
-            UnaryOpKind::Deref => {
-                if let Some(l) = &lhs {
-                    if let Some(ptr_to) = &l.ty.ptr_to {
-                        (**ptr_to).clone()
-                    } else {
-                        Type {
-                            kind: TypeKind::Int,
-                            ptr_to: None,
-                            arr_size: 1,
-                        }
-                    }
-                } else {
-                    Type {
-                        kind: TypeKind::Int,
-                        ptr_to: None,
-                        arr_size: 1,
-                    }
-                }
-            }
-        },
-        NodeKind::Comparison(_) => Type {
-            kind: TypeKind::Int,
-            ptr_to: None,
-            arr_size: 1,
-        },
-        NodeKind::Num(_) => Type {
-            kind: TypeKind::Int,
-            ptr_to: None,
+	let ty = match &kind {
+			NodeKind::BinaryOp(op) => {
+					match op {
+							BinaryOpKind::Add | BinaryOpKind::Sub => {
+									if let (Some(l), Some(r)) = (&lhs, &rhs) {
+											match (&l.ty.kind, &r.ty.kind) {
+													(TypeKind::Ptr, TypeKind::Int) | (TypeKind::Arr, TypeKind::Int) => {
+															// ポインタ/配列 + 整数 の場合
+															match &l.ty.ptr_to {
+																	Some(ptr_to) if ptr_to.kind == TypeKind::Arr => {
+																			// 多次元配列の場合、1次元分の型を進める
+																			(**ptr_to).clone()
+																	},
+																	_ => l.ty.clone(),
+															}
+													},
+													(TypeKind::Int, TypeKind::Ptr) | (TypeKind::Int, TypeKind::Arr) => {
+															// 整数 + ポインタ/配列 の場合
+															match &r.ty.ptr_to {
+																	Some(ptr_to) if ptr_to.kind == TypeKind::Arr => {
+																			// 多次元配列の場合、1次元分の型を進める
+																			(**ptr_to).clone()
+																	},
+																	_ => r.ty.clone(),
+															}
+													},
+													_ => Type { kind: TypeKind::Int, ptr_to: None, arr_size: 1 },
+											}
+									} else {
+											Type { kind: TypeKind::Int, ptr_to: None, arr_size: 1 }
+									}
+							},
+							BinaryOpKind::Mul | BinaryOpKind::Div => {
+									Type { kind: TypeKind::Int, ptr_to: None, arr_size: 1 }
+							}
+					}
+			},
+			NodeKind::UnaryOp(op) => {
+					match op {
+							UnaryOpKind::Ref => {
+									if let Some(l) = &lhs {
+											Type { kind: TypeKind::Ptr, ptr_to: Some(Box::new(l.ty.clone())), arr_size: 1 }
+									} else {
+											Type { kind: TypeKind::Ptr, ptr_to: None, arr_size: 1 }
+									}
+							},
+							UnaryOpKind::Deref => {
+									if let Some(l) = &lhs {
+											match &l.ty.kind {
+													TypeKind::Ptr | TypeKind::Arr => {
+															l.ty.ptr_to.as_ref().map_or(
+																	Type { kind: TypeKind::Int, ptr_to: None, arr_size: 1 },
+																	|ptr_to| (**ptr_to).clone()
+															)
+													},
+													_ => Type { kind: TypeKind::Int, ptr_to: None, arr_size: 1 },
+											}
+									} else {
+											Type { kind: TypeKind::Int, ptr_to: None, arr_size: 1 }
+									}
+							}
+					}
+			},
+			// 他のケースは変更なし
+			_ => match &kind {
+					NodeKind::Comparison(_) => Type { kind: TypeKind::Int, ptr_to: None, arr_size: 1 },
+					NodeKind::Num(_) => Type { kind: TypeKind::Int, ptr_to: None, arr_size: 1 },
+					NodeKind::LVar(lvar) => lvar.ty.clone(),
+					NodeKind::Assign => {
+							if let Some(l) = &lhs {
+									l.ty.clone()
+							} else {
+									Type { kind: TypeKind::Int, ptr_to: None, arr_size: 1 }
+							}
+					},
+					NodeKind::Return => Type { kind: TypeKind::Int, ptr_to: None, arr_size: 1 },
+					NodeKind::Block(_) => Type { kind: TypeKind::Int, ptr_to: None, arr_size: 1 },
+					NodeKind::Fncall(func, _) => func.ty.clone(),
+					NodeKind::Fndef(func, _) => func.ty.clone(),
+					NodeKind::For | NodeKind::While | NodeKind::If | NodeKind::Else => {
+							Type { kind: TypeKind::Int, ptr_to: None, arr_size: 1 }
+					},
+					_ => unreachable!(),
+			},
+	};
 
-            arr_size: 1,
-        },
-        NodeKind::LVar(ref lvar) => lvar.ty.clone(),
-        NodeKind::Assign => {
-            if let Some(l) = &lhs {
-                l.ty.clone()
-            } else {
-                Type {
-                    kind: TypeKind::Int,
-                    ptr_to: None,
-                    arr_size: 1,
-                }
-            }
-        }
-        NodeKind::Return => Type {
-            kind: TypeKind::Int,
-            ptr_to: None,
-            arr_size: 1,
-        },
-        NodeKind::Block(_) => Type {
-            kind: TypeKind::Int,
-            ptr_to: None,
-            arr_size: 1,
-        },
-        NodeKind::Fncall(ref func, _) => func.ty.clone(),
-        NodeKind::Fndef(ref func, _) => func.ty.clone(),
-        NodeKind::For | NodeKind::While | NodeKind::If | NodeKind::Else => Type {
-            kind: TypeKind::Int,
-            ptr_to: None,
-            arr_size: 1,
-        },
-    };
-
-    Node { kind, lhs, rhs, ty }
+	Node { kind, lhs, rhs, ty }
 }
+// fn create_new_node(kind: NodeKind, lhs: Option<Box<Node>>, rhs: Option<Box<Node>>) -> Node {
+// }
 
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
@@ -408,13 +393,19 @@ impl Parser {
         let mut ty = self.ty()?;
         let name = self.tokens[self.pos].str.clone();
         self.pos += 1;
-        if self.consume("[") {
-            let num = self.expect_number()?;
+
+				let mut nums = Vec::new();
+        while self.consume("[") {
+            nums.push(self.expect_number()?);
             self.expect("]")?;
+        }
+
+				for num in nums.iter().rev() {
             ty.ptr_to = Some(Box::new(ty.clone()));
             ty.kind = TypeKind::Arr;
-            ty.arr_size = num as usize;
-        }
+            ty.arr_size = *num as usize;
+				}
+
         let lvar = self.create_lvar(&name, ty.clone());
 
         if self.consume("=") {
@@ -601,24 +592,30 @@ impl Parser {
                     return Err(format!("変数 '{}' が見つかりません", name));
                 }
 
-                let node = self.expr()?;
+                let mut indices = Vec::new();
+                indices.push(self.expr()?);
                 self.expect("]")?;
 
-                // a[3] -> *(a+3)
-                let llhs = Some(Box::new(create_new_node(
-                    NodeKind::LVar(lvar.unwrap()),
-                    None,
-                    None,
-                )));
-                let lrhs = Some(Box::new(node));
-                // lhs: a+3
-                let lhs = create_new_node(NodeKind::BinaryOp(BinaryOpKind::Add), llhs, lrhs);
-                // *lhs
-                return Ok(create_new_node(
-                    NodeKind::UnaryOp(UnaryOpKind::Deref),
-                    Some(Box::new(lhs)),
-                    None,
-                ));
+                while self.consume("[") {
+                    indices.push(self.expr()?);
+                    self.expect("]")?;
+                }
+
+                let mut node = create_new_node(NodeKind::LVar(lvar.unwrap()), None, None);
+
+                // a[3][4] -> *(*(a+3)+4)
+                for index in indices.iter() {
+                    node = create_new_node(
+                        NodeKind::BinaryOp(BinaryOpKind::Add),
+                        Some(Box::new(node)),
+                        Some(Box::new(index.clone())),
+                    );
+                }
+								Ok(create_new_node(
+                        NodeKind::UnaryOp(UnaryOpKind::Deref),
+                        Some(Box::new(node)),
+                        None,
+                    ))
             } else {
                 if lvar.is_none() {
                     return Err(format!("変数 '{}' が見つかりません", name));
@@ -660,14 +657,6 @@ impl Parser {
                     kind: TypeKind::Ptr,
                     ptr_to: Some(Box::new(ty)),
                     arr_size: 1,
-                };
-            } else if self.consume("[") {
-                // let node = self.expr()?;
-                let num = self.expect_number()?;
-                ty = Type {
-                    kind: TypeKind::Arr,
-                    ptr_to: Some(Box::new(ty)),
-                    arr_size: num as usize,
                 };
             } else {
                 break;
