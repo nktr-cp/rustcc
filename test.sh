@@ -19,7 +19,7 @@ assert() {
 
 assert 42 "
 int main() {
-	int a[2];
+	int a[10];
 	a[0] = 10;
 	a[1] = 32;
 	int *p;

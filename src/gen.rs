@@ -144,18 +144,18 @@ pub fn gen(node: &Node, id: &mut i32) {
 
             println!("  push rax # rax has return value after call");
         }
-        NodeKind::Fndef(lvar, args, locals) => {
+        NodeKind::Fndef(func, args) => {
             const REGS: [&str; 6] = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
 
-            println!(".global {}", lvar.name);
-            println!("{}:", lvar.name);
+            println!(".global {}", func.name);
+            println!("{}:", func.name);
 
             // prologue
             println!("  push rbp");
             println!("  mov rbp, rsp # save base pointer");
             println!(
                 "  sub rsp, {} # make spaces for local variables",
-                locals.len() * 8 + args.len() * 8 + 8
+                func.stack_size
             );
 
             // save arguments to local variables
@@ -205,7 +205,7 @@ pub fn gen(node: &Node, id: &mut i32) {
                                 let size = match lvar.ty.ptr_to.as_ref().unwrap().kind {
                                     TypeKind::Int => 4,
                                     TypeKind::Ptr => 8,
-																		TypeKind::Arr => 8,
+                                    TypeKind::Arr => 8,
                                 };
 
                                 println!("  imul rdi, {}", size);
@@ -223,7 +223,7 @@ pub fn gen(node: &Node, id: &mut i32) {
                                 let size = match lvar.ty.ptr_to.as_ref().unwrap().kind {
                                     TypeKind::Int => 4,
                                     TypeKind::Ptr => 8,
-																		TypeKind::Arr => 8,
+                                    TypeKind::Arr => 8,
                                 };
 
                                 println!("  imul rdi, {}", size);

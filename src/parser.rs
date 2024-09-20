@@ -49,25 +49,26 @@ pub struct LVar {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Function {
     pub name: String,
+    pub stack_size: usize,
     pub ty: Type,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum NodeKind {
-    BinaryOp(BinaryOpKind),                // Binaty operations: +, -, *, /
-    UnaryOp(UnaryOpKind),                  // Unary operations: &, *
-    Comparison(ComparisonOpKind),          // Comparison operations: ==, !=, <, <=, >, >=
-    Num(i32),                              // Numeric literals
-    LVar(LVar),                            // Local variable
-    Assign,                                // Assignment
-    Return,                                // Return statement
-    Block(Vec<Node>),                      // Block of statements
-    Fncall(Function, Vec<Node>),           // Function call with arguments
-    Fndef(Function, Vec<Node>, Vec<LVar>), // Function definition (name, parameters, local variables)
-    For,                                   // For
-    While,                                 // While
-    If,                                    // If
-    Else,                                  // Else
+    BinaryOp(BinaryOpKind),       // Binaty operations: +, -, *, /
+    UnaryOp(UnaryOpKind),         // Unary operations: &, *
+    Comparison(ComparisonOpKind), // Comparison operations: ==, !=, <, <=, >, >=
+    Num(i32),                     // Numeric literals
+    LVar(LVar),                   // Local variable
+    Assign,                       // Assignment
+    Return,                       // Return statement
+    Block(Vec<Node>),             // Block of statements
+    Fncall(Function, Vec<Node>),  // Function call with arguments
+    Fndef(Function, Vec<Node>),   // Function definition (name, parameters)
+    For,                          // For
+    While,                        // While
+    If,                           // If
+    Else,                         // Else
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -83,7 +84,8 @@ pub struct Parser {
     pos: usize,
     fn_idx: usize,
     pub locals: Vec<HashMap<String, LVar>>, // function name -> local variables
-    pub functions: Vec<Function>,
+    pub functions: Vec<String>,
+    stack_size: usize,
 }
 
 // 左右の子に応じてノードの型を決定する
@@ -191,7 +193,7 @@ fn create_new_node(kind: NodeKind, lhs: Option<Box<Node>>, rhs: Option<Box<Node>
             arr_size: 1,
         },
         NodeKind::Fncall(ref func, _) => func.ty.clone(),
-        NodeKind::Fndef(ref func, _, _) => func.ty.clone(),
+        NodeKind::Fndef(ref func, _) => func.ty.clone(),
         NodeKind::For | NodeKind::While | NodeKind::If | NodeKind::Else => Type {
             kind: TypeKind::Int,
             ptr_to: None,
@@ -210,19 +212,22 @@ impl Parser {
             fn_idx: 0, // indicates the index of the current function
             locals: Vec::new(),
             functions: Vec::new(),
+            stack_size: 8,
         }
     }
 
     fn create_lvar(&mut self, name: &str, ty: Type) -> LVar {
-        let mut offset = self.locals[self.fn_idx]
-            .values()
-            .map(|lvar| lvar.offset)
-            .max()
-            .unwrap_or(0);
-        if ty.kind == TypeKind::Int {
-            offset += 8 * ty.arr_size;
-        } else {
-            offset += 8 * ty.arr_size;
+        let offset = self.stack_size;
+        if ty.kind == TypeKind::Int || ty.kind == TypeKind::Ptr {
+            self.stack_size += 8;
+        } else if ty.kind == TypeKind::Arr {
+            let mut ty_iter = ty.clone();
+            let mut elem_cnt = 1;
+            while ty_iter.ptr_to.is_some() {
+                elem_cnt *= ty_iter.arr_size;
+                ty_iter = *ty_iter.ptr_to.unwrap();
+            }
+            self.stack_size += 8 * elem_cnt;
         }
         let lvar = LVar {
             name: name.to_string(),
@@ -277,6 +282,7 @@ impl Parser {
             self.locals.push(HashMap::new());
             nodes.push(self.function()?);
             self.fn_idx += 1;
+            self.stack_size = 8;
         }
         return Ok(nodes);
     }
@@ -293,26 +299,22 @@ impl Parser {
             self.expect(")")?;
         }
 
-        let func = Function {
-            name: name.clone(),
-            ty: ty.clone(),
-        };
-
-        if self.functions.contains(&func) {
+        if self.functions.contains(&name) {
             return Err(format!("関数{}は既に定義されています", name));
         } else {
-            self.functions.push(func.clone());
+            self.functions.push(name.clone());
         }
 
         let body = self.stmt()?;
 
         let rhs = Some(Box::new(body));
+        let func = Function {
+            name: name.clone(),
+            stack_size: self.stack_size,
+            ty: ty.clone(),
+        };
         Ok(create_new_node(
-            NodeKind::Fndef(
-                func.clone(),
-                params.clone(),
-                self.locals[self.fn_idx].values().cloned().collect(),
-            ),
+            NodeKind::Fndef(func.clone(), params.clone()),
             None,
             rhs,
         ))
@@ -404,16 +406,16 @@ impl Parser {
     fn decl(&mut self) -> Result<Node, String> {
         let node;
         let mut ty = self.ty()?;
-				let name = self.tokens[self.pos].str.clone();
+        let name = self.tokens[self.pos].str.clone();
         self.pos += 1;
-				if self.consume("[") {
-					let num = self.expect_number()?;
-					self.expect("]")?;
-					ty.ptr_to = Some(Box::new(ty.clone()));
-					ty.kind = TypeKind::Arr;
-					ty.arr_size = num as usize;
-				}
-				let lvar = self.create_lvar(&name, ty.clone());
+        if self.consume("[") {
+            let num = self.expect_number()?;
+            self.expect("]")?;
+            ty.ptr_to = Some(Box::new(ty.clone()));
+            ty.kind = TypeKind::Arr;
+            ty.arr_size = num as usize;
+        }
+        let lvar = self.create_lvar(&name, ty.clone());
 
         if self.consume("=") {
             let lhs = create_new_node(NodeKind::LVar(lvar.clone()), None, None);
@@ -582,6 +584,7 @@ impl Parser {
                     ptr_to: None,
                     arr_size: 1,
                 },
+                stack_size: 0, // dummy
             };
             self.pos += 1;
 
@@ -594,21 +597,29 @@ impl Parser {
                     return Ok(create_new_node(NodeKind::Fncall(func, args), None, None));
                 }
             } else if self.consume("[") {
-							if lvar.is_none() {
-								return Err(format!("変数 '{}' が見つかりません", name));
-							}
+                if lvar.is_none() {
+                    return Err(format!("変数 '{}' が見つかりません", name));
+                }
 
-							let node = self.expr()?;
-							self.expect("]")?;
+                let node = self.expr()?;
+                self.expect("]")?;
 
-							// a[3] -> *(a+3)
-							let llhs = Some(Box::new(create_new_node(NodeKind::LVar(lvar.unwrap()), None, None)));
-							let lrhs = Some(Box::new(node));
-							// lhs: a+3 
-							let lhs = create_new_node(NodeKind::BinaryOp(BinaryOpKind::Add), llhs, lrhs);
-							// *lhs
-							return Ok(create_new_node(NodeKind::UnaryOp(UnaryOpKind::Deref), Some(Box::new(lhs)), None));
-						} else {
+                // a[3] -> *(a+3)
+                let llhs = Some(Box::new(create_new_node(
+                    NodeKind::LVar(lvar.unwrap()),
+                    None,
+                    None,
+                )));
+                let lrhs = Some(Box::new(node));
+                // lhs: a+3
+                let lhs = create_new_node(NodeKind::BinaryOp(BinaryOpKind::Add), llhs, lrhs);
+                // *lhs
+                return Ok(create_new_node(
+                    NodeKind::UnaryOp(UnaryOpKind::Deref),
+                    Some(Box::new(lhs)),
+                    None,
+                ));
+            } else {
                 if lvar.is_none() {
                     return Err(format!("変数 '{}' が見つかりません", name));
                 } else {
@@ -651,14 +662,14 @@ impl Parser {
                     arr_size: 1,
                 };
             } else if self.consume("[") {
-							// let node = self.expr()?;
-							let num = self.expect_number()?;
-							ty = Type {
-								kind: TypeKind::Arr,
-								ptr_to: Some(Box::new(ty)),
-								arr_size: num as usize,
-							};
-						} else {
+                // let node = self.expr()?;
+                let num = self.expect_number()?;
+                ty = Type {
+                    kind: TypeKind::Arr,
+                    ptr_to: Some(Box::new(ty)),
+                    arr_size: num as usize,
+                };
+            } else {
                 break;
             }
         }
