@@ -5,7 +5,7 @@
 ```
 program     ::= (type ident (function | global_decl))*
 function    ::= "(" paramlist? ")" "{" stmt* "}"
-global_decl ::= ("[" num "]")* ("=" expr)?
+global_decl ::= ("[" num "]")*
 paramlist   ::= type ident ("," type ident)*
 stmt        ::= expr ";"
               | "{" stmt* "}"
