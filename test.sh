@@ -17,6 +17,53 @@ assert() {
   fi
 }
 
+assert 0 "
+int x;
+
+int main() {
+	return x;
+}
+"
+
+assert 42 "
+int x;
+
+int main() {
+	x = 42;
+	return x;
+}
+
+"
+
+assert 42 "
+int *x;
+
+int main() {
+	int y = 42;
+	x = &y;
+	return *x;
+}
+"
+
+assert 42 "
+int x[2];
+
+int main() {
+	x[1] = 42;
+	return x[1];
+}
+"
+
+assert 42 "
+int x[2][3][4];
+
+int main() {
+	x[1][2][1] = 42;
+	return x[1][2][1];
+}
+
+"
+
 assert 42 "
 int main() {
 	int x[2][3];

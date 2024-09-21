@@ -159,7 +159,7 @@ pub fn tokenize(input: &str) -> Vec<Token> {
             }
         }
 
-        error::error("トークナイズできません");
+				error::error(format!("トークナイズできません: {}", c).as_str());
     }
 
     tokens.push(Token {

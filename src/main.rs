@@ -4,6 +4,7 @@ mod lexer;
 mod parser;
 
 use std::env;
+use crate::parser::NodeKind;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -21,8 +22,9 @@ fn main() {
     let mut id = 0;
     for (i, node) in code.iter().enumerate() {
         gen::gen(node, &mut id);
-        if i != code.len() - 1 {
+				if matches!(node.kind, NodeKind::GVarDef(_)) || i == code.len() - 1 {
+					continue;
+				}
             println!("  pop rax");
-        }
     }
 }

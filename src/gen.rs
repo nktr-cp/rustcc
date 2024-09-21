@@ -16,6 +16,10 @@ fn gen_lval(node: &Node, id: &mut i32) {
                 gen(node.lhs.as_ref().unwrap(), id);
             }
         }
+				NodeKind::GVar(gvar) => {
+						println!("  lea rax, {}[rip]", gvar.name);
+						println!("  push rax");
+				}
         _ => {
             error::error("代入の左辺値が変数ではありません");
         }
@@ -35,6 +39,25 @@ pub fn gen(node: &Node, id: &mut i32) {
             println!("  push rax");
             return;
         }
+				NodeKind::GVarDef(gvar) => {
+					println!("  .bss");
+					println!("  .global {}", gvar.name);
+					println!("{}:", gvar.name);
+					println!("  .zero {}\n", get_type_size(&gvar.ty)); // 初期化はサポートしてないので0埋め
+					return;
+				}
+				NodeKind::GVar(gvar) => {
+					gen_lval(node, id);
+					//　配列の場合は中身を参照しない
+					// なんでGVarのときだけこの処理が必要なのかはよくわかってない (アドレッシングモードの違い？)
+					if gvar.ty.kind == TypeKind::Arr {
+						return;
+					}
+					println!("  pop rax");
+					println!("  mov rax, [rax]");
+					println!("  push rax");
+					return;
+				}
         NodeKind::Assign => {
             gen_lval(node.lhs.as_ref().unwrap(), id);
             gen(node.rhs.as_ref().unwrap(), id);
@@ -42,7 +65,7 @@ pub fn gen(node: &Node, id: &mut i32) {
             println!("  pop rdi");
             println!("  pop rax");
             println!("  mov [rax], rdi");
-            println!("  push rdi");
+            println!("  push rdi\n");
             return;
         }
         NodeKind::Return => {
@@ -50,7 +73,7 @@ pub fn gen(node: &Node, id: &mut i32) {
             println!("  pop rax");
             println!("  mov rsp, rbp");
             println!("  pop rbp");
-            println!("  ret");
+            println!("  ret\n");
             return;
         }
         NodeKind::If => {
@@ -126,7 +149,7 @@ pub fn gen(node: &Node, id: &mut i32) {
                 gen(stmt, id);
             }
         }
-        NodeKind::Fncall(lvar, args) => {
+        NodeKind::Fncall(func, args) => {
             const REGS: [&str; 6] = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
 
             for (i, arg) in args.iter().enumerate() {
@@ -140,7 +163,7 @@ pub fn gen(node: &Node, id: &mut i32) {
             println!("  mov r10, rsp");
             println!("  and r10, 15 # save offset to r10");
             println!("  sub rsp, r10 # align rsp to be divisible by 16");
-            println!("  call {}", lvar.name);
+            println!("  call {}", func.name);
             println!("  add rsp, r10 # adjust stack pointer after call");
 
             println!("  push rax # rax has return value after call");
@@ -148,14 +171,15 @@ pub fn gen(node: &Node, id: &mut i32) {
         NodeKind::Fndef(func, args) => {
             const REGS: [&str; 6] = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
 
-            println!(".global {}", func.name);
+						println!("  .text");
+            println!("  .global {}", func.name);
             println!("{}:", func.name);
 
             // prologue
             println!("  push rbp");
             println!("  mov rbp, rsp # save base pointer");
             println!(
-                "  sub rsp, {} # make spaces for local variables",
+                "  sub rsp, {} # make spaces for local variables\n",
                 func.stack_size
             );
 
@@ -170,7 +194,7 @@ pub fn gen(node: &Node, id: &mut i32) {
             println!("  pop rax");
 
             // epilogue
-            println!("  mov rsp, rbp # restore stack pointer");
+            println!("\n  mov rsp, rbp # restore stack pointer");
             println!("  pop rbp # discard base pointer");
             println!("  ret");
             return;

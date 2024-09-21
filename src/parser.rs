@@ -1,4 +1,5 @@
 use crate::lexer::{Token, TokenKind};
+use crate::error;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -47,6 +48,12 @@ pub struct LVar {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct GVar {
+	pub name: String,
+	pub ty: Type,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct Function {
     pub name: String,
     pub stack_size: usize,
@@ -60,6 +67,8 @@ pub enum NodeKind {
     Comparison(ComparisonOpKind), // Comparison operations: ==, !=, <, <=, >, >=
     Num(i32),                     // Numeric literals
     LVar(LVar),                   // Local variable
+		GVar(GVar),									  // Global variable
+		GVarDef(GVar),								// Global variable definition
     Assign,                       // Assignment
     Return,                       // Return statement
     Block(Vec<Node>),             // Block of statements
@@ -84,7 +93,8 @@ pub struct Parser {
     pos: usize,
     fn_idx: usize,
     pub locals: Vec<HashMap<String, LVar>>, // function name -> local variables
-    pub functions: Vec<String>,
+		pub globals: HashMap<String, GVar>,
+    pub functions: Vec<Function>,
     stack_size: usize,
 }
 
@@ -187,7 +197,6 @@ fn create_new_node(kind: NodeKind, lhs: Option<Box<Node>>, rhs: Option<Box<Node>
                 }
             }
         },
-        // 他のケースは変更なし
         _ => match &kind {
             NodeKind::Comparison(_) => Type {
                 kind: TypeKind::Int,
@@ -200,6 +209,7 @@ fn create_new_node(kind: NodeKind, lhs: Option<Box<Node>>, rhs: Option<Box<Node>
                 arr_size: 1,
             },
             NodeKind::LVar(lvar) => lvar.ty.clone(),
+						NodeKind::GVar(gvar) | NodeKind::GVarDef(gvar) => gvar.ty.clone(),
             NodeKind::Assign => {
                 if let Some(l) = &lhs {
                     l.ty.clone()
@@ -234,8 +244,6 @@ fn create_new_node(kind: NodeKind, lhs: Option<Box<Node>>, rhs: Option<Box<Node>
 
     Node { kind, lhs, rhs, ty }
 }
-// fn create_new_node(kind: NodeKind, lhs: Option<Box<Node>>, rhs: Option<Box<Node>>) -> Node {
-// }
 
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
@@ -244,6 +252,7 @@ impl Parser {
             pos: 0,
             fn_idx: 0, // indicates the index of the current function
             locals: Vec::new(),
+						globals: HashMap::new(),
             functions: Vec::new(),
             stack_size: 8,
         }
@@ -274,6 +283,19 @@ impl Parser {
     fn find_lvar(&self, name: &str) -> Option<&LVar> {
         self.locals[self.fn_idx].get(name)
     }
+
+		fn create_gvar(&mut self, name: &str, ty: Type) -> GVar {
+			let gvar = GVar {
+				name: name.to_string(),
+				ty: ty.clone(),
+			};
+			self.globals.insert(name.to_string(), gvar.clone());
+			gvar
+		}
+
+		fn find_gvar(&self, name: &str) -> Option<&GVar> {
+			self.globals.get(name)
+		}
 
     fn consume(&mut self, op: &str) -> bool {
         if self.tokens[self.pos].str != op.to_string() {
@@ -311,19 +333,28 @@ impl Parser {
 
     pub fn program(&mut self) -> Result<Vec<Node>, String> {
         let mut nodes = Vec::new();
+				let mut ty;
         while !self.at_eof() {
-            self.locals.push(HashMap::new());
-            nodes.push(self.function()?);
-            self.fn_idx += 1;
-            self.stack_size = 8;
+						ty = self.ty()?;
+						if self.tokens[self.pos].kind != TokenKind::Ident {
+							error::error("変数名がありません");
+						}
+						let name = self.tokens[self.pos].str.clone();
+						self.pos += 1;
+
+						if self.tokens[self.pos].str == "(" {
+							self.locals.push(HashMap::new());
+							nodes.push(self.function(name, ty)?);
+							self.fn_idx += 1;
+							self.stack_size = 8;
+						} else {
+							nodes.push(self.global_decl(name, ty)?);
+						}
         }
         return Ok(nodes);
     }
 
-    fn function(&mut self) -> Result<Node, String> {
-        let ty = self.ty()?;
-        let name = self.tokens[self.pos].str.clone();
-        self.pos += 1;
+    fn function(&mut self, name: String, ty: Type) -> Result<Node, String> {
         self.expect("(")?;
 
         let mut params = Vec::new();
@@ -332,11 +363,9 @@ impl Parser {
             self.expect(")")?;
         }
 
-        if self.functions.contains(&name) {
-            return Err(format!("関数{}は既に定義されています", name));
-        } else {
-            self.functions.push(name.clone());
-        }
+        if self.functions.iter().any(|x| x.name == name) {
+						return Err(format!("関数 '{}' はすでに定義されています", name));
+				}
 
         let body = self.stmt()?;
 
@@ -346,6 +375,7 @@ impl Parser {
             stack_size: self.stack_size,
             ty: ty.clone(),
         };
+				self.functions.push(func.clone());
         Ok(create_new_node(
             NodeKind::Fndef(func.clone(), params.clone()),
             None,
@@ -367,6 +397,31 @@ impl Parser {
         }
         Ok(params)
     }
+
+		fn global_decl(&mut self, name: String, mut ty: Type) -> Result<Node, String> {
+			let node;
+
+			let mut nums = Vec::new();
+        while self.consume("[") {
+            nums.push(self.expect_number()?);
+            self.expect("]")?;
+        }
+
+        for num in nums.iter().rev() {
+            ty.ptr_to = Some(Box::new(ty.clone()));
+            ty.kind = TypeKind::Arr;
+            ty.arr_size = *num as usize;
+        }
+
+        let gvar = self.create_gvar(&name, ty.clone());
+				self.globals.insert(name.clone(), gvar.clone());
+
+				node = create_new_node(NodeKind::GVarDef(gvar.clone()), None, None);
+
+				self.expect(";")?;
+        Ok(node)
+		}
+
 
     fn stmt(&mut self) -> Result<Node, String> {
         let node: Node;
@@ -614,29 +669,23 @@ impl Parser {
         } else if self.tokens[self.pos].kind == TokenKind::Ident {
             let name = self.tokens[self.pos].str.clone();
             let lvar = self.find_lvar(&name).cloned();
-            let func = Function {
-                name: name.clone(),
-                // 一旦戻り値の型は適当にする
-                // sizeofとか実装したらちゃんとやる
-                ty: Type {
-                    kind: TypeKind::Int,
-                    ptr_to: None,
-                    arr_size: 1,
-                },
-                stack_size: 0, // dummy
-            };
+						let gvar = self.find_gvar(&name).cloned();
+						let mut func = self.functions.iter().find(|&x| x.name == name).cloned();
+						if func.is_none() {
+							func = Some(Function {name: name.clone(), stack_size: 0, ty: Type {kind: TypeKind::Int, ptr_to: None, arr_size: 1}});
+						}
             self.pos += 1;
 
             if self.consume("(") {
                 let mut args = Vec::new();
                 if self.consume(")") {
-                    return Ok(create_new_node(NodeKind::Fncall(func, args), None, None));
+                    return Ok(create_new_node(NodeKind::Fncall(func.unwrap(), args), None, None));
                 } else {
                     args = self.arglist()?;
-                    return Ok(create_new_node(NodeKind::Fncall(func, args), None, None));
+                    return Ok(create_new_node(NodeKind::Fncall(func.unwrap(), args), None, None));
                 }
             } else if self.consume("[") {
-                if lvar.is_none() {
+                if lvar.is_none() && gvar.is_none() {
                     return Err(format!("変数 '{}' が見つかりません", name));
                 }
 
@@ -649,7 +698,12 @@ impl Parser {
                     self.expect("]")?;
                 }
 
-                let mut node = create_new_node(NodeKind::LVar(lvar.unwrap()), None, None);
+								let mut node;
+								if lvar.is_some() {
+                	node = create_new_node(NodeKind::LVar(lvar.unwrap()), None, None);
+								} else {
+									node = create_new_node(NodeKind::GVar(gvar.unwrap()), None, None);
+								}
 
                 // a[3][4] -> *(*(a+3)+4)
                 for index in indices.iter() {
@@ -665,10 +719,14 @@ impl Parser {
                     None,
                 ))
             } else {
-                if lvar.is_none() {
+                if lvar.is_none() && gvar.is_none() {
                     return Err(format!("変数 '{}' が見つかりません", name));
                 } else {
+									if lvar.is_some() {
                     return Ok(create_new_node(NodeKind::LVar(lvar.unwrap()), None, None));
+									} else {
+										return Ok(create_new_node(NodeKind::GVar(gvar.unwrap()), None, None));
+									}
                 }
             }
         } else {
