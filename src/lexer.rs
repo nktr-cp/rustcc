@@ -140,6 +140,14 @@ pub fn tokenize(input: &str) -> Vec<Token> {
                     });
                     continue;
                 }
+                "char" => {
+                    tokens.push(Token {
+                        kind: TokenKind::Reserved,
+                        val: None,
+                        str: ident,
+                    });
+                    continue;
+                }
                 "sizeof" => {
                     tokens.push(Token {
                         kind: TokenKind::Sizeof,
@@ -159,7 +167,7 @@ pub fn tokenize(input: &str) -> Vec<Token> {
             }
         }
 
-				error::error(format!("トークナイズできません: {}", c).as_str());
+        error::error(format!("トークナイズできません: {}", c).as_str());
     }
 
     tokens.push(Token {

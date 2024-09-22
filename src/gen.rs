@@ -16,10 +16,10 @@ fn gen_lval(node: &Node, id: &mut i32) {
                 gen(node.lhs.as_ref().unwrap(), id);
             }
         }
-				NodeKind::GVar(gvar) => {
-						println!("  lea rax, {}[rip]", gvar.name);
-						println!("  push rax");
-				}
+        NodeKind::GVar(gvar) => {
+            println!("  lea rax, {}[rip]", gvar.name);
+            println!("  push rax");
+        }
         _ => {
             error::error("代入の左辺値が変数ではありません");
         }
@@ -35,36 +35,44 @@ pub fn gen(node: &Node, id: &mut i32) {
         NodeKind::LVar(_lvar) => {
             gen_lval(node, id);
             println!("  pop rax");
+            if node.ty.kind == TypeKind::Char {
+                println!("  movzx rax, BYTE PTR [rax]");
+            } else {
+                println!("  mov rax, [rax]");
+            }
+            println!("  push rax");
+            return;
+        }
+        NodeKind::GVarDef(gvar) => {
+            println!("  .bss");
+            println!("  .global {}", gvar.name);
+            println!("{}:", gvar.name);
+            println!("  .zero {}\n", get_type_size(&gvar.ty)); // 初期化はサポートしてないので0埋め
+            return;
+        }
+        NodeKind::GVar(gvar) => {
+            gen_lval(node, id);
+            //　配列の場合は中身を参照しない
+            // なんでGVarのときだけこの処理が必要なのかはよくわかってない (アドレッシングモードの違い？)
+            if gvar.ty.kind == TypeKind::Arr {
+                return;
+            }
+            println!("  pop rax");
             println!("  mov rax, [rax]");
             println!("  push rax");
             return;
         }
-				NodeKind::GVarDef(gvar) => {
-					println!("  .bss");
-					println!("  .global {}", gvar.name);
-					println!("{}:", gvar.name);
-					println!("  .zero {}\n", get_type_size(&gvar.ty)); // 初期化はサポートしてないので0埋め
-					return;
-				}
-				NodeKind::GVar(gvar) => {
-					gen_lval(node, id);
-					//　配列の場合は中身を参照しない
-					// なんでGVarのときだけこの処理が必要なのかはよくわかってない (アドレッシングモードの違い？)
-					if gvar.ty.kind == TypeKind::Arr {
-						return;
-					}
-					println!("  pop rax");
-					println!("  mov rax, [rax]");
-					println!("  push rax");
-					return;
-				}
         NodeKind::Assign => {
             gen_lval(node.lhs.as_ref().unwrap(), id);
             gen(node.rhs.as_ref().unwrap(), id);
 
             println!("  pop rdi");
             println!("  pop rax");
-            println!("  mov [rax], rdi");
+            if node.lhs.as_ref().unwrap().ty.kind == TypeKind::Char {
+                println!("  mov BYTE PTR [rax], dil");
+            } else {
+                println!("  mov [rax], rdi");
+            }
             println!("  push rdi\n");
             return;
         }
@@ -171,7 +179,7 @@ pub fn gen(node: &Node, id: &mut i32) {
         NodeKind::Fndef(func, args) => {
             const REGS: [&str; 6] = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
 
-						println!("  .text");
+            println!("  .text");
             println!("  .global {}", func.name);
             println!("{}:", func.name);
 
@@ -184,10 +192,17 @@ pub fn gen(node: &Node, id: &mut i32) {
             );
 
             // save arguments to local variables
-            for (i, _arg) in args.iter().enumerate() {
-                let offset = 8 * i + 8;
-                println!("  mov rax, rbp");
-                println!("  mov [rax-{}], {} # push argument", offset, REGS[i]);
+            for (i, arg) in args.iter().enumerate() {
+                let mut offset = 0;
+                match &arg.kind {
+                    NodeKind::LVar(lvar) => {
+                        offset = lvar.offset;
+                    }
+                    _ => {
+                        error::error("関数の引数が変数ではありません");
+                    }
+                }
+                println!("  mov [rbp-{}], {} # push argument", offset, REGS[i]);
             }
 
             gen(node.rhs.as_ref().unwrap(), id);
@@ -207,7 +222,11 @@ pub fn gen(node: &Node, id: &mut i32) {
             UnaryOpKind::Deref => {
                 gen(node.lhs.as_ref().unwrap(), id);
                 println!("  pop rax");
-                println!("  mov rax, [rax]");
+                if node.ty.kind == TypeKind::Char {
+                    println!("  movzx rax, BYTE PTR [rax]");
+                } else {
+                    println!("  mov rax, [rax]");
+                }
                 println!("  push rax");
                 return;
             }

@@ -3,8 +3,8 @@ mod gen;
 mod lexer;
 mod parser;
 
-use std::env;
 use crate::parser::NodeKind;
+use std::env;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -17,14 +17,14 @@ fn main() {
     let mut parser = parser::Parser::new(tokens);
     let code = parser.program().expect("構文解析に失敗しました");
 
-    println!(".intel_syntax noprefix");
+    println!("  .intel_syntax noprefix");
 
     let mut id = 0;
     for (i, node) in code.iter().enumerate() {
         gen::gen(node, &mut id);
-				if matches!(node.kind, NodeKind::GVarDef(_)) || i == code.len() - 1 {
-					continue;
-				}
-            println!("  pop rax");
+        if matches!(node.kind, NodeKind::GVarDef(_)) || i == code.len() - 1 {
+            continue;
+        }
+        println!("  pop rax");
     }
 }

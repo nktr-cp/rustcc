@@ -17,6 +17,55 @@ assert() {
   fi
 }
 
+assert 42 "
+int main() {
+	char c;
+
+	c = 42;
+	return c;
+}
+"
+
+assert 42 "
+int main() {
+	char c;
+	char *p;
+
+	p = &c;
+	*p = 42;
+	return c;
+}
+"
+
+assert 42 "
+int main() {
+	char c = 10;
+	char d = 32;
+
+	return c + d;
+}
+"
+
+assert 42 "
+char c[4];
+
+int main() {
+	c[0] = 42;
+	return c[0];
+}
+"
+
+assert 3 "
+int main() {
+	char x[4];
+	x[0] = -1;
+	x[1] = 2;
+	int y;
+	y = 4;
+	return x[0] + y;	
+}
+"
+
 assert 0 "
 int x;
 
