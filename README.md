@@ -30,7 +30,7 @@ primary     ::= num
               | "(" expr ")"
 arglist     ::= expr ("," expr)*
 type        ::= base_type "*"*
-base_type   ::= "int"
+base_type   ::= "int" | "char"
 ```
 
 ### note
