@@ -1,5 +1,17 @@
 # simple C compiler written in Rust
 
+## Usage
+```bash
+$ git clone https://github.com/nktr-cp/rustcc
+$ cd rustcc
+
+$ cargo make image # イメージのビルド
+$ cargo make login # コンテナ内にログイン
+$ cargo make cb_test # test.shのテストをコンテナ内で実行
+
+$ cargo run $SOURCE_CODE # 引数にソースコードを渡してコード生成
+```
+
 ## Production rule
 生成規則:
 ```
@@ -28,7 +40,7 @@ primary     ::= num
               | ident ("(" arglist? ")")?
               | ident ("[" expr "]")+
               | "(" expr ")"
-							| string_literal
+              | string_literal
 arglist     ::= expr ("," expr)*
 type        ::= base_type "*"*
 base_type   ::= "int" | "char"
