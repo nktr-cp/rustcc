@@ -18,6 +18,24 @@ assert() {
 }
 
 assert 42 "
+/*
+ - supported operators
+	 - +, -, *, /, %, ==, !=, <, <=, >, >=
+	 - = (assignment)
+	 - unary +, -, !
+	 - sizeof
+	 - & (address), * (dereference)
+	 - [] (array subscript), () (function call)
+*/
+int main() {
+	int x = 42; // final return value
+	int* y = &x; // pointer to x;
+	int** z = &y; // pointer to y;
+	return **z; // comment
+}
+"
+
+assert 42 "
 int g(int *arr) {
 	arr[3] = 42;
 	return arr[3];

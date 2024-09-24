@@ -36,6 +36,32 @@ pub fn tokenize(input: &str) -> Vec<Token> {
             continue;
         }
 
+        if c == '/' && chars.clone().nth(1) == Some('/') {
+            chars.next();
+            chars.next();
+            while let Some(&c) = chars.peek() {
+                if c == '\n' {
+                    break;
+                }
+                chars.next();
+            }
+            continue;
+        }
+
+        if c == '/' && chars.clone().nth(1) == Some('*') {
+            chars.next();
+            chars.next();
+            while let Some(&c) = chars.peek() {
+                if c == '*' && chars.clone().nth(1) == Some('/') {
+                    chars.next();
+                    chars.next();
+                    break;
+                }
+                chars.next();
+            }
+            continue;
+        }
+
         if c == '"' {
             let mut lit = String::new();
             chars.next();
