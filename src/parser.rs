@@ -62,12 +62,20 @@ pub struct Function {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct Strlit {
+    pub idx: usize,
+    pub len: usize,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum NodeKind {
     BinaryOp(BinaryOpKind),       // Binaty operations: +, -, *, /
     UnaryOp(UnaryOpKind),         // Unary operations: &, *
     Comparison(ComparisonOpKind), // Comparison operations: ==, !=, <, <=, >, >=
     Num(i32),                     // Numeric literals
+    Strlit(Strlit),               // String literals
     LVar(LVar),                   // Local variable
+    LVarDef(LVar),                // Local variable definition
     GVar(GVar),                   // Global variable
     GVarDef(GVar),                // Global variable definition
     Assign,                       // Assignment
@@ -96,6 +104,7 @@ pub struct Parser {
     pub locals: Vec<HashMap<String, LVar>>, // function name -> local variables
     pub globals: HashMap<String, GVar>,
     pub functions: Vec<Function>,
+    pub str_literals: Vec<String>,
     stack_size: usize,
 }
 
@@ -211,6 +220,7 @@ fn create_new_node(kind: NodeKind, lhs: Option<Box<Node>>, rhs: Option<Box<Node>
                 arr_size: 1,
             },
             NodeKind::LVar(lvar) => lvar.ty.clone(),
+            NodeKind::LVarDef(lvar) => lvar.ty.clone(),
             NodeKind::GVar(gvar) | NodeKind::GVarDef(gvar) => gvar.ty.clone(),
             NodeKind::Assign => {
                 if let Some(l) = &lhs {
@@ -223,6 +233,15 @@ fn create_new_node(kind: NodeKind, lhs: Option<Box<Node>>, rhs: Option<Box<Node>
                     }
                 }
             }
+            NodeKind::Strlit(lit) => Type {
+                kind: TypeKind::Arr,
+                ptr_to: Some(Box::new(Type {
+                    kind: TypeKind::Char,
+                    ptr_to: None,
+                    arr_size: 1,
+                })),
+                arr_size: lit.len,
+            },
             NodeKind::Return => Type {
                 kind: TypeKind::Int,
                 ptr_to: None,
@@ -256,24 +275,18 @@ impl Parser {
             locals: Vec::new(),
             globals: HashMap::new(),
             functions: Vec::new(),
-            stack_size: 8,
+            str_literals: Vec::new(),
+            stack_size: 0,
         }
     }
 
     fn create_lvar(&mut self, name: &str, ty: Type) -> LVar {
-        let offset = self.stack_size;
-        // self.stack_size += get_type_size(&ty);
-        if ty.kind == TypeKind::Char || ty.kind == TypeKind::Int || ty.kind == TypeKind::Ptr {
-            self.stack_size += 8;
-        } else if ty.kind == TypeKind::Arr {
-            let mut ty_iter = ty.clone();
-            let mut elem_cnt = 1;
-            while ty_iter.ptr_to.is_some() {
-                elem_cnt *= ty_iter.arr_size;
-                ty_iter = *ty_iter.ptr_to.unwrap();
-            }
-            self.stack_size += 8 * elem_cnt;
-        }
+        let offset = if self.stack_size == 0 {
+            8
+        } else {
+            self.stack_size
+        };
+        self.stack_size = offset + get_type_size(&ty).next_multiple_of(8);
         let lvar = LVar {
             name: name.to_string(),
             offset: offset,
@@ -349,7 +362,7 @@ impl Parser {
                 self.locals.push(HashMap::new());
                 nodes.push(self.function(name, ty)?);
                 self.fn_idx += 1;
-                self.stack_size = 8;
+                self.stack_size = 0;
             } else {
                 nodes.push(self.global_decl(name, ty)?);
             }
@@ -521,7 +534,7 @@ impl Parser {
                 Some(Box::new(self.expr()?)),
             );
         } else {
-            node = create_new_node(NodeKind::LVar(lvar.clone()), None, None);
+            node = create_new_node(NodeKind::LVarDef(lvar.clone()), None, None);
         }
         Ok(node)
     }
@@ -664,7 +677,17 @@ impl Parser {
     }
 
     fn primary(&mut self) -> Result<Node, String> {
-        if self.consume("(") {
+        if self.tokens[self.pos].kind == TokenKind::Strlit {
+            self.str_literals.push(self.tokens[self.pos].str.clone());
+            self.pos += 1;
+
+            let lit = Strlit {
+                idx: self.str_literals.len() - 1,
+                len: self.str_literals[self.str_literals.len() - 1].len(),
+            };
+
+            return Ok(create_new_node(NodeKind::Strlit(lit), None, None));
+        } else if self.consume("(") {
             let node = self.expr()?;
             self.expect(")")?;
             Ok(node)
@@ -805,7 +828,7 @@ impl Parser {
             })
         } else {
             Err(format!(
-                "型名cが期待されますが、{}でした",
+                "型名が期待されますが、{}でした",
                 self.tokens[self.pos].str
             ))
         }

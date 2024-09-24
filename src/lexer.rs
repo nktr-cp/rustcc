@@ -12,6 +12,7 @@ pub enum TokenKind {
     Num,
     Sizeof,
     Eof,
+    Strlit,
 }
 
 #[derive(Clone)]
@@ -32,6 +33,26 @@ pub fn tokenize(input: &str) -> Vec<Token> {
     while let Some(&c) = chars.peek() {
         if c.is_whitespace() {
             chars.next();
+            continue;
+        }
+
+        if c == '"' {
+            let mut lit = String::new();
+            chars.next();
+            while let Some(&c) = chars.peek() {
+                if c == '"' {
+                    break;
+                }
+                lit.push(c);
+                chars.next();
+            }
+            chars.next();
+
+            tokens.push(Token {
+                kind: TokenKind::Strlit,
+                val: None,
+                str: lit,
+            });
             continue;
         }
 

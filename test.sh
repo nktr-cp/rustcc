@@ -18,6 +18,167 @@ assert() {
 }
 
 assert 42 "
+int g(int *arr) {
+	arr[3] = 42;
+	return arr[3];
+}
+
+int main() {
+	int arr[10];
+	g(arr);
+	return arr[3];
+}
+"
+
+# assert 42 "
+# int g(int *arr) {
+# 	arr[3] = 42;
+# 	return arr[3];
+# }
+
+# int f() {
+# 	int arr[10];
+# 	g(arr);
+# 	return arr[3];
+# }
+
+# int main() {
+# 	return f();
+# }
+# "
+
+# exec_with_include() {
+# 	expected="$1"
+# 	input="$2"
+
+# 	echo "
+# 	#include <unistd.h>
+# 	#include <stdio.h>
+# 	" > include.c
+
+# 	cargo run -- "$input" > tmp.s
+# 	cc -c include.c
+# 	cc -c tmp.s
+# 	cc tmp.o include.o -o tmp
+# 	./tmp
+# 	actual="$?"
+
+# 	if [ "$actual" = "$expected" ]; then
+# 		echo "$input => $actual"
+# 	else
+# 		echo "$input => $expected expected, but got $actual"
+# 		exit 1
+# 	fi
+# }
+
+# exec_with_include 724 "
+# int	print_nums(int *nums)
+# {
+# 	int		i;
+# 	char	c;
+
+# 	i = 0;
+# 	while (i < 10)
+# 	{
+# 		c = nums[i] + 48;
+# 		i = i + 1;
+# 		write (1, &c, 1);
+# 	}
+# 	write (1, \"\n\", 1);
+# 	return (0);
+# }
+
+# int	is_ok(int *pattern, int cur, int check)
+# {
+# 	dprintf(2, \"######## hello, you reached here {is_ok: cur: {%d}, check: {%d} #########\n\", cur);
+# 	int	i;
+
+# 	i = 0;
+# 	while (i < cur)
+# 	{
+# 		if (pattern[i] == check)
+# 			return (0);
+# 		if (pattern[i] + cur - i == check)
+# 			return (0);
+# 		if (pattern[i] - cur + i == check)
+# 			return (0);
+# 		i = i + 1;
+# 	}
+# 	dprintf(2, \"######## hello, you have reached at the end of is_ok {is_ok: cur: {%d}, check: {%d} #########\n\", cur);
+# 	return (1);
+# }
+
+# int	enumerate(int *pattern, int cur)
+# {
+# 	dprintf(2, \"######## hello, you reached here {enumerate: %d} #########\n\", cur);
+# 	int	ret;
+# 	int	i;
+
+# 	ret = 0;
+# 	if (cur == 10)
+# 	{
+# 		print_nums(pattern);
+# 		return (1);
+# 	}
+# 	i = 0;
+# 	while (i < 10)
+# 	{
+# 		if (is_ok(pattern, cur, i))
+# 		{
+# 			dprintf(2, \"######## before: {pattern[%d] = %d} #########\n\", cur, i);
+# 			*pattern = i;
+# 			dprintf(2, \"######## after: {pattern[%d] = %d} #########\n\", cur, i);
+# 			ret = ret + enumerate(pattern, cur + 1);
+# 		}
+# 		i = i + 1;
+# 	}
+# 	return (ret);
+# }	
+
+# int	ft_ten_queens_puzzle()
+# {
+# 	int	pattern[10];
+# 	pattern[0] = 0;
+# 	dprintf(2, \"######## hello, you reached here (ft_ten_queens_puzzle) #########\n\");
+
+# 	return (enumerate(pattern, 0));
+# }
+
+# int main() {
+# 	dprintf(2, \"######## hello, you reached here (main) #########\n\");
+# 	return ft_ten_queens_puzzle();
+# }
+# "
+
+assert 0 "
+char hello[15];
+
+int main() {
+	return *hello;
+}
+"
+
+# 52 = 4 + '0' = 4 + 48
+assert 52 "
+int main() {
+	char c[15] = \"hello, 42!\n\";
+	char *p = c + 7;
+	return *p;
+}
+"
+
+assert 52 "
+int main() {
+	char c[15] = \"hello, 42!\n\";
+	char *p = \"this is a test\";
+	if (p[0] != 116) {
+		return 1;
+	}
+	return c[7];
+}
+"
+
+assert 42 "
 int main() {
 	char c;
 
@@ -498,6 +659,37 @@ alloc4() {
 	fi
 }
 
+print() {
+	expected="$1"
+	input="$2"
+
+	echo "
+	#include <stdio.h>
+	int print(const char* str) {
+		puts(str);
+		int len = 0;
+		while (str[len]) {
+			len = len + 1;
+		}
+		return len;
+	}
+	" > print.c
+
+	cargo run -- "$input" > tmp.s
+	cc -c print.c
+	cc -c tmp.s
+	cc tmp.o print.o -o tmp
+	./tmp
+	actual="$?"
+
+	if [ "$actual" = "$expected" ]; then
+		echo "$input => $actual"
+	else
+		echo "$input => $expected expected, but got $actual"
+		exit 1
+	fi
+}
+
 
 no_arg 42 "int main() {return no_arg();}"
 fib 55 "int main() {return fibonacchi(10);}"
@@ -510,6 +702,7 @@ int main() {
 	q = p + 3;
 	return *q;
 }"
+print 12 "int main() { return print(\"hello, world\"); }" # this should entail output
 
 
 rm -f tmp* *.s *.c *.o 

@@ -19,6 +19,13 @@ fn main() {
 
     println!("  .intel_syntax noprefix");
 
+    // define all string literals
+    // println!("  .rodata"); // read-only data section
+    for (i, lit) in parser.str_literals.iter().enumerate() {
+        println!(".LC{}:", i);
+        println!("  .string \"{}\"", lit);
+    }
+
     let mut id = 0;
     for (i, node) in code.iter().enumerate() {
         gen::gen(node, &mut id);

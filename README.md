@@ -28,6 +28,7 @@ primary     ::= num
               | ident ("(" arglist? ")")?
               | ident ("[" expr "]")+
               | "(" expr ")"
+							| string_literal
 arglist     ::= expr ("," expr)*
 type        ::= base_type "*"*
 base_type   ::= "int" | "char"

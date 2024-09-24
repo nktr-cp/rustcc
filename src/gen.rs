@@ -32,6 +32,7 @@ pub fn gen(node: &Node, id: &mut i32) {
             println!("  push {}", val);
             return;
         }
+        NodeKind::LVarDef(_) => {}
         NodeKind::LVar(_lvar) => {
             gen_lval(node, id);
             println!("  pop rax");
@@ -58,7 +59,11 @@ pub fn gen(node: &Node, id: &mut i32) {
                 return;
             }
             println!("  pop rax");
-            println!("  mov rax, [rax]");
+            if node.ty.kind == TypeKind::Char {
+                println!("  movzx rax, BYTE PTR [rax]");
+            } else {
+                println!("  mov rax, [rax]");
+            }
             println!("  push rax");
             return;
         }
@@ -166,12 +171,17 @@ pub fn gen(node: &Node, id: &mut i32) {
             }
             println!("  mov rax, {}", args.len());
 
+            println!("  mov al, 0");
+
             // rspの位置を調整
             // r10に調整分を保存
             println!("  mov r10, rsp");
+            println!("  sub r10, 8");
             println!("  and r10, 15 # save offset to r10");
             println!("  sub rsp, r10 # align rsp to be divisible by 16");
+            println!("  push r10 # save offset to stack");
             println!("  call {}", func.name);
+            println!("  pop r10 # restore offset from stack");
             println!("  add rsp, r10 # adjust stack pointer after call");
 
             println!("  push rax # rax has return value after call");
@@ -221,6 +231,9 @@ pub fn gen(node: &Node, id: &mut i32) {
             }
             UnaryOpKind::Deref => {
                 gen(node.lhs.as_ref().unwrap(), id);
+                if node.ty.kind == TypeKind::Arr {
+                    return;
+                }
                 println!("  pop rax");
                 if node.ty.kind == TypeKind::Char {
                     println!("  movzx rax, BYTE PTR [rax]");
@@ -231,6 +244,11 @@ pub fn gen(node: &Node, id: &mut i32) {
                 return;
             }
         },
+        NodeKind::Strlit(lit) => {
+            println!("  lea rax, .LC{}[rip]", lit.idx);
+            println!("  push rax");
+            return;
+        }
         _ => {
             gen(node.lhs.as_ref().unwrap(), id);
             gen(node.rhs.as_ref().unwrap(), id);
