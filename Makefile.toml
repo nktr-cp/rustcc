@@ -5,4 +5,4 @@ script = ["docker build --platform linux/amd64 -t compilerbook -f Dockerfile ."]
 script = ["docker run --rm -it -v $(pwd):/ws --platform linux/amd64 compilerbook"]
 
 [tasks.cb_test]
-script = ["docker run -v $(pwd):/ws -w /ws --platform linux/amd64 compilerbook ./test.sh"]
+script = ["docker run -v $(pwd):/ws -w /ws --platform linux/amd64 compilerbook ./test.sh 2>/dev/null"]

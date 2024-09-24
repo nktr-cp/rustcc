@@ -1,31 +1,82 @@
 #!/bin/bash
 
+GREEN="\033[32m"
+RED="\033[31m"
+YELLOW="\033[33m"
+CYAN="\033[36m"
+RESET="\033[0m"
+
 assert() {
   expected="$1"
   input="$2"
 
-  cargo run -- "$input" >tmp.s
+  cargo run -- "$input" > tmp.s
   cc -o tmp tmp.s
   ./tmp
   actual="$?"
 
   if [ "$actual" = "$expected" ]; then
-    echo "$input => $actual"
+    echo -e "✅ \n${GREEN}Input: $input\nResult: $actual\n${RESET}"
   else
-    echo "$input => $expected expected, but got $actual"
+    echo -e "❌ \n${RED}$input => $expected expected, but got $actual${RESET}"
     exit 1
   fi
 }
 
+exec_with_include() {
+  expected="$1"
+  input="$2"
+
+  echo "
+  #include <unistd.h>
+  #include <stdio.h>
+	#include <stdlib.h>
+  " > include.c
+
+  cargo run -- "$input" > tmp.s
+  cc -c include.c
+  cc -c tmp.s
+  cc tmp.o include.o -o tmp
+  ./tmp
+  actual="$?"
+
+  if [ "$actual" != "$expected" ]; then
+    echo -e "${RED}$input => $expected expected, but got $actual${RESET}"
+    exit 1
+  fi
+}
+
+exec_with_include 42 "
+int main() {
+	puts(\"\n\n\");
+	puts(\"${CYAN}/* ************************************************************************** */${RESET}\");
+	puts(\"${CYAN}/*                                                                            */${RESET}\");
+	puts(\"${CYAN}/*                                                        :::      ::::::::   */${RESET}\");
+	puts(\"${CYAN}/*   main.c                                             :+:      :+:    :+:   */${RESET}\");
+	puts(\"${CYAN}/*                                                    +:+ +:+         +:+     */${RESET}\");
+	puts(\"${CYAN}/*   By: knishiok <knishiok@student.42.jp>          +#+  +:+       +#+        */${RESET}\");
+	puts(\"${CYAN}/*                                                +#+#+#+#+#+   +#+           */${RESET}\");
+	puts(\"${CYAN}/*   Created: 2024/09/25 05:01:57 by knishiok          #+#    #+#             */${RESET}\");
+	puts(\"${CYAN}/*   Updated: 2024/09/25 05:01:57 by knishiok         ###   ########.fr       */${RESET}\");
+	puts(\"${CYAN}/*                                                                            */${RESET}\");
+	puts(\"${CYAN}/* ************************************************************************** */${RESET}\");
+	puts(\"\n\n\");
+	return 42;
+}
+"
+
 assert 42 "
 /*
  - supported operators
-	 - +, -, *, /, %, ==, !=, <, <=, >, >=
+	 - +, -, *, /, ==, !=, <, <=, >, >=
 	 - = (assignment)
-	 - unary +, -, !
+	 - unary +, -
 	 - sizeof
+	 - global variable
+	 - char type, string literal
 	 - & (address), * (dereference)
 	 - [] (array subscript), () (function call)
+	 - possible to link with object files
 */
 int main() {
 	int x = 42; // final return value
@@ -47,126 +98,6 @@ int main() {
 	return arr[3];
 }
 "
-
-# assert 42 "
-# int g(int *arr) {
-# 	arr[3] = 42;
-# 	return arr[3];
-# }
-
-# int f() {
-# 	int arr[10];
-# 	g(arr);
-# 	return arr[3];
-# }
-
-# int main() {
-# 	return f();
-# }
-# "
-
-# exec_with_include() {
-# 	expected="$1"
-# 	input="$2"
-
-# 	echo "
-# 	#include <unistd.h>
-# 	#include <stdio.h>
-# 	" > include.c
-
-# 	cargo run -- "$input" > tmp.s
-# 	cc -c include.c
-# 	cc -c tmp.s
-# 	cc tmp.o include.o -o tmp
-# 	./tmp
-# 	actual="$?"
-
-# 	if [ "$actual" = "$expected" ]; then
-# 		echo "$input => $actual"
-# 	else
-# 		echo "$input => $expected expected, but got $actual"
-# 		exit 1
-# 	fi
-# }
-
-# exec_with_include 724 "
-# int	print_nums(int *nums)
-# {
-# 	int		i;
-# 	char	c;
-
-# 	i = 0;
-# 	while (i < 10)
-# 	{
-# 		c = nums[i] + 48;
-# 		i = i + 1;
-# 		write (1, &c, 1);
-# 	}
-# 	write (1, \"\n\", 1);
-# 	return (0);
-# }
-
-# int	is_ok(int *pattern, int cur, int check)
-# {
-# 	dprintf(2, \"######## hello, you reached here {is_ok: cur: {%d}, check: {%d} #########\n\", cur);
-# 	int	i;
-
-# 	i = 0;
-# 	while (i < cur)
-# 	{
-# 		if (pattern[i] == check)
-# 			return (0);
-# 		if (pattern[i] + cur - i == check)
-# 			return (0);
-# 		if (pattern[i] - cur + i == check)
-# 			return (0);
-# 		i = i + 1;
-# 	}
-# 	dprintf(2, \"######## hello, you have reached at the end of is_ok {is_ok: cur: {%d}, check: {%d} #########\n\", cur);
-# 	return (1);
-# }
-
-# int	enumerate(int *pattern, int cur)
-# {
-# 	dprintf(2, \"######## hello, you reached here {enumerate: %d} #########\n\", cur);
-# 	int	ret;
-# 	int	i;
-
-# 	ret = 0;
-# 	if (cur == 10)
-# 	{
-# 		print_nums(pattern);
-# 		return (1);
-# 	}
-# 	i = 0;
-# 	while (i < 10)
-# 	{
-# 		if (is_ok(pattern, cur, i))
-# 		{
-# 			dprintf(2, \"######## before: {pattern[%d] = %d} #########\n\", cur, i);
-# 			*pattern = i;
-# 			dprintf(2, \"######## after: {pattern[%d] = %d} #########\n\", cur, i);
-# 			ret = ret + enumerate(pattern, cur + 1);
-# 		}
-# 		i = i + 1;
-# 	}
-# 	return (ret);
-# }	
-
-# int	ft_ten_queens_puzzle()
-# {
-# 	int	pattern[10];
-# 	pattern[0] = 0;
-# 	dprintf(2, \"######## hello, you reached here (ft_ten_queens_puzzle) #########\n\");
-
-# 	return (enumerate(pattern, 0));
-# }
-
-# int main() {
-# 	dprintf(2, \"######## hello, you reached here (main) #########\n\");
-# 	return ft_ten_queens_puzzle();
-# }
-# "
 
 assert 0 "
 char hello[15];
@@ -452,8 +383,6 @@ int main() {
 }
 "
 
-# ポインタに対する加減算を変更したのでテストも変更
-# まだアラインメントが変なので2引かないといけない (要修正: issue #2)
 assert 55 "
 int main() {
 	int x = 21;
@@ -594,12 +523,12 @@ fib() {
 	./tmp
 	actual="$?"
 
-	if [ "$actual" = "$expected" ]; then
-		echo "$input => $actual"
-	else
-		echo "$input => $expected expected, but got $actual"
-		exit 1
-	fi
+  if [ "$actual" = "$expected" ]; then
+    echo -e "✅ \n${GREEN}Input: $input\nResult: $actual\n${RESET}"
+  else
+    echo -e "❌ \n${RED}$input => $expected expected, but got $actual${RESET}"
+    exit 1
+  fi
 }
 
 add() {
@@ -617,12 +546,12 @@ add() {
 	./tmp
 	actual="$?"
 
-	if [ "$actual" = "$expected" ]; then
-		echo "$input => $actual"
-	else
-		echo "$input => $expected expected, but got $actual"
-		exit 1
-	fi
+  if [ "$actual" = "$expected" ]; then
+    echo -e "✅ \n${GREEN}Input: $input\nResult: $actual\n${RESET}"
+  else
+    echo -e "❌ \n${RED}$input => $expected expected, but got $actual${RESET}"
+    exit 1
+  fi
 }
 
 no_arg() {
@@ -640,11 +569,11 @@ no_arg() {
 	./tmp
 	actual="$?"
 
-	if [ "$actual" = "$expected" ]; then
-		echo "$input => $actual"
-	else
-		echo "$input => $expected expected, but got $actual"
-		exit 1
+  if [ "$actual" = "$expected" ]; then
+    echo -e "✅ \n${GREEN}Input: $input\nResult: $actual\n${RESET}"
+  else
+    echo -e "❌ \n${RED}$input => $expected expected, but got $actual${RESET}"
+    exit 1
 	fi
 }
 
@@ -669,12 +598,12 @@ alloc4() {
 	./tmp
 	actual="$?"
 
-	if [ "$actual" = "$expected" ]; then
-		echo "$input => $actual"
-	else
-		echo "$input => $expected expected, but got $actual"
-		exit 1
-	fi
+  if [ "$actual" = "$expected" ]; then
+    echo -e "✅ \n${GREEN}Input: $input\nResult: $actual\n${RESET}"
+  else
+    echo -e "❌ \n${RED}$input => $expected expected, but got $actual${RESET}"
+    exit 1
+  fi
 }
 
 print() {
@@ -700,14 +629,13 @@ print() {
 	./tmp
 	actual="$?"
 
-	if [ "$actual" = "$expected" ]; then
-		echo "$input => $actual"
-	else
-		echo "$input => $expected expected, but got $actual"
-		exit 1
-	fi
+  if [ "$actual" = "$expected" ]; then
+    echo -e "✅ \n${GREEN}Input: $input\nResult: $actual\n${RESET}"
+  else
+    echo -e "❌ \n${RED}$input => $expected expected, but got $actual${RESET}"
+    exit 1
+  fi
 }
-
 
 no_arg 42 "int main() {return no_arg();}"
 fib 55 "int main() {return fibonacchi(10);}"
